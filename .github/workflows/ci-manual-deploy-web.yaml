@@ -1,0 +1,67 @@
+name: ci-manual-deploy-web
+run-name: ci-manual-deploy-web - ${{ github.event.inputs.environment }} - ${{ github.ref_name }}-${{ github.sha }} - review ${{ github.event.inputs.noexecutechangeset }}
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: 'Environment: [ dev | prod ]'
+        required: true
+        options:
+          - dev
+          - prod
+
+      noexecutechangeset:
+        type: choice
+        description: 'Review changes in Cloudformation first?'
+        required: false
+        options:
+          - false
+          - true
+
+env:
+  environmentName: ${{ github.event.inputs.environment }}
+  awsaccount_target: ${{ vars.AWS_ACCOUNT }}
+  region: us-east-1
+  isNoExecuteChangeset: "${{ github.event.inputs.noexecutechangeset }}"
+  workspaceDir: ${{ github.workspace }}
+
+jobs:
+
+  buildanddeploy:
+    # needs: [checks]
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    env:
+      working-directory: ./
+      AWS_MAX_ATTEMPTS: '50'
+      AWS_RETRY_MODE: 'standard' # [standard, adaptive]
+      AWS_PAGER: ""
+      appName: devops-toolkit-web #stack blueprint
+      stackName: devops-toolkit-web-${{github.event.inputs.environment}}
+    steps:
+      # code checkout
+      - name: Checkout.
+        uses: actions/checkout@v1
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      # based on branch, assume aws credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.region }}
+
+      - name: Deploy template
+        env:
+          route53AppDomainName: ${{ vars.ROUTE53_APP_DOMAINNAME }}
+          route53AppHostedZoneId: ${{ vars.HOSTEDZONEID }}
+          apiDomain: api.${{ vars.ROUTE53_APP_DOMAINNAME }}
+        run: |   
+          # RUN DEPLOY SCRIPT WITH ENVT-SPECIFIC VARS
+          ${{ github.workspace }}/bin/deploy-web.sh
+

@@ -1,0 +1,108 @@
+name: ci-manual-buildanddeploy-webcontent
+run-name: ci-manual-buildanddeploy-webcontent - ${{ github.event.inputs.environment }} - ${{ github.ref_name }}-${{ github.sha }} - review ${{ github.event.inputs.noexecutechangeset }}
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: 'Environment: [ dev | prod ]'
+        required: true
+        options:
+          - dev
+          - prod
+
+env:
+  environmentName: ${{ github.event.inputs.environment }}
+  awsaccount_target: ${{ vars.AWS_ACCOUNT }}
+  region: ap-southeast-2
+  workspaceDir: ${{ github.workspace }}
+
+jobs:
+
+  buildanddeploy:
+    environment: ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    env:
+      working-directory: ./
+      AWS_MAX_ATTEMPTS: '50'
+      AWS_RETRY_MODE: 'standard' # [standard, adaptive]
+      AWS_PAGER: ""
+    steps:
+      # code checkout
+      - name: Checkout.
+        uses: actions/checkout@v1
+
+      # based on branch, assume aws credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.region }}
+
+      - name: GetConfigVars
+        id: configVars
+        env:
+          loginCFStackName: "devops-toolkit-login-${{ github.event.inputs.environment }}"
+        run: |
+          cd ${{ github.workspace }}
+          
+          export USERPOOL_ID=$(aws cloudformation describe-stacks --stack-name ${{env.loginCFStackName}} \
+          --region ap-southeast-2 --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --no-paginate --output text)
+          echo "USERPOOL_ID=$USERPOOL_ID"
+          echo "userPoolId=$USERPOOL_ID" >> $GITHUB_OUTPUT
+
+          export USERPOOL_WEBCLIENTID=$(aws cloudformation describe-stacks --stack-name ${{env.loginCFStackName}} \
+          --region ap-southeast-2 --query "Stacks[0].Outputs[?OutputKey=='UserPoolWebClientId'].OutputValue" --no-paginate --output text)
+          echo "USERPOOL_WEBCLIENTID=$USERPOOL_WEBCLIENTID"
+          echo "userPoolWebClientId=$USERPOOL_WEBCLIENTID" >> $GITHUB_OUTPUT
+          
+          export AUTH_SUBDOMAIN=devopstoolkit-auth-${{ github.event.inputs.environment }}
+          echo "AUTH_SUBDOMAIN=$AUTH_SUBDOMAIN"
+          echo "authSubdomain=$AUTH_SUBDOMAIN" >> $GITHUB_OUTPUT
+          
+          export BASE_URL=toolkit.${{ vars.ROUTE53_APP_DOMAINNAME }}
+          echo "BASE_URL=$BASE_URL"
+          echo "baseUrl=$BASE_URL" >> $GITHUB_OUTPUT
+          
+          export API_BASE_URL=api.${{ vars.ROUTE53_APP_DOMAINNAME }}/toolkit
+          echo "API_BASE_URL=$API_BASE_URL"
+          echo "apiBaseUrl=$API_BASE_URL" >> $GITHUB_OUTPUT
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Set configs
+        env:
+          loginCFStackName: "devops-toolkit-login-${{ github.event.inputs.environment }}"
+          userPoolId: ${{ steps.configVars.outputs.userPoolId }}
+          userPoolWebClientId: ${{ steps.configVars.outputs.userPoolWebClientId }}
+          authSubdomain: ${{ steps.configVars.outputs.authSubdomain }}
+          baseUrl: ${{ steps.configVars.outputs.baseUrl }}
+          apiBaseUrl: ${{ steps.configVars.outputs.apiBaseUrl }}
+        run: |
+          cd ${{ github.workspace }}
+                    
+          echo "Processing json config"
+          sed -i 's/{USERPOOL_ID}/${{env.userPoolId}}/g' ./devops-toolkit-web/src/amplifyconfiguration.json.config
+          sed -i 's/{USERPOOL_WEBCLIENTID}/${{env.userPoolWebClientId}}/g' ./devops-toolkit-web/src/amplifyconfiguration.json.config
+          sed -i 's/{AUTH_SUBDOMAIN}/${{env.authSubdomain}}/g' ./devops-toolkit-web/src/amplifyconfiguration.json.config
+          sed -i 's|{BASE_URL}|${{env.baseUrl}}|g' ./devops-toolkit-web/src/amplifyconfiguration.json.config
+          cp ${{ github.workspace }}/devops-toolkit-web/src/amplifyconfiguration.json.config ${{ github.workspace }}/devops-toolkit-web/src/amplifyconfiguration.json
+
+          # Use a different delimiter for the Url
+          sed -i 's|{API_BASE_URL}|${{env.apiBaseUrl}}|g' ./devops-toolkit-web/src/environments/environment.ts.config
+          cp ${{ github.workspace }}/devops-toolkit-web/src/environments/environment.ts.config ${{ github.workspace }}/devops-toolkit-web/src/environments/environment.ts
+
+          # TEMP TESTING
+          # aws s3 cp ./devops-toolkit-web/ s3://brycestest-ap-southeast-2-786538038206/ --recursive
+
+      - name: Deploy to env
+        run: |
+          ${{ github.workspace }}/bin/deploy-webcontent.sh
+
+      - name: Invalidate cache
+        run: |
+          aws cloudfront list-distributions --output json --query "DistributionList.Items[?Comment=='devops-toolkit-web-${{ github.event.inputs.environment }}'].Id" | awk -F '"' '{print $2}' | xargs -I{} aws cloudfront create-invalidation --distribution-id {} --paths "/*"

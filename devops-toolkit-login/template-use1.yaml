@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  DevOps Toolkit Login; Cognito UserPool & API
+
+Transform:
+  - AWS::Serverless-2016-10-31
+
+Parameters:
+  EnvironmentName:
+    Type: String
+
+  Route53CFStackName:
+    Type: String
+
+  EmailVerificationMessage:
+    Type: String
+    Default: "Your verification code is {####}"
+
+  EmailVerificationSubject:
+    Type: String
+    Default: "Your verification code"
+
+  LambdaReservedConcurrency:
+    Type: String
+    Default: 10
+
+Resources:
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    # DeletionPolicy: Retain
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}"
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: False
+      UsernameConfiguration:
+        CaseSensitive: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+
+        - Name: family_name
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+
+        - Name: given_name
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+
+      AutoVerifiedAttributes:
+        - email
+
+      EmailVerificationMessage: !Ref EmailVerificationMessage
+      EmailVerificationSubject: !Ref EmailVerificationSubject
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      LambdaConfig:
+        PostConfirmation: !GetAtt CognitoPostConfirmationFunction.Arn
+
+  UserPoolViewersGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: "Viewers"
+      UserPoolId: !Ref UserPool
+
+  UserPoolAdministratorGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: "Administrators"
+      UserPoolId: !Ref UserPool
+
+  UserPoolWebClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${AWS::StackName}l-webclient"
+      CallbackURLs:
+        - Fn::Join: ["", ["https://", Fn::ImportValue: !Sub "${Route53CFStackName}:HostedZone:DomainName", "/" ]]
+      LogoutURLs:
+        - Fn::Join: ["", ["https://", Fn::ImportValue: !Sub "${Route53CFStackName}:HostedZone:DomainName", "/logout" ]]
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      RefreshTokenValidity: 7
+      AccessTokenValidity:  60
+      IdTokenValidity:  60
+      UserPoolId: !Ref UserPool
+      ReadAttributes:
+        - email
+        - email_verified
+        - family_name
+        - given_name
+        - updated_at
+        - custom:group_name
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      ExplicitAuthFlows:
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+  UserTable:
+    Type: AWS::DynamoDB::Table
+    # DeletionPolicy: Retain
+    # UpdateReplacePolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "UserId"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "UserId"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
+  CognitoPostConfirmationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./dist/tbs-app-login.zip
+      Handler: lambda/cognito-postconfirmation/index.handler
+      Runtime: nodejs14.x
+      MemorySize: 128
+      Timeout: 30
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: !Ref LambdaReservedConcurrency
+      Description: Executes on user signup confirmation
+      Tracing: Active
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPolicy
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+                - dynamodb:DescribeTable
+                - dynamodb:ConditionCheckItem
+              Resource:
+                - !GetAtt UserTable.Arn
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          USER_TABLE_NAME: !Ref UserTable
+
+  UpdateParameterFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref CognitoPostConfirmationFunction ] ]
+      RetentionInDays: 365
+
+  UserPoolPostConfirmationLambdaInvokePermission:
+    Type: "AWS::Lambda::Permission"
+    DependsOn: UserPool
+    Properties:
+      Action: "lambda:invokeFunction"
+      Principal: "cognito-idp.amazonaws.com"
+      FunctionName: !Ref CognitoPostConfirmationFunction
+      SourceArn: !GetAtt UserPool.Arn
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+    Description: Devops Toolkit UserPool
+    Export:
+      Name: !Sub "${AWS::StackName}:UserPool:Id"
+
+  UserPoolArn:
+    Value: !GetAtt UserPool.Arn
+    Description: Devops Toolkit UserPool Arn
+    Export:
+      Name: !Sub "${AWS::StackName}:UserPool:Arn"
+
+  UserPoolWebClientId:
+    Value: !Ref UserPoolWebClient
+    Description: Web ClientId
+    Export:
+      Name: !Sub "${AWS::StackName}:UserPool:WebClientId"

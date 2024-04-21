@@ -1,0 +1,32 @@
+.sidemargin {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+
+
+.thumbnail:hover {
+  position: relative;
+  top:-5px;
+  left:-5px;
+  height: 150px;
+  display:block;
+  z-index:999;
+}
+
+/* The following allow cards in group to have equal heights */
+.card-group {
+  display: flex;
+  width: 100%;
+}
+
+.card-deck .card {
+  display: flex;
+  //flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-block {
+  flex: 1 1 auto;
+}

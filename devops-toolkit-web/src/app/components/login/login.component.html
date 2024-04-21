@@ -1,0 +1,31 @@
+<div class="container page">
+<div class="row top-buffer-x2">
+  <div class="col-3"></div>
+  <div class="col-6">
+
+        <div class="row">
+          <div class="col-12 text-center">
+            <span class="hint">Sign-in or submit a request for an account here.</span>
+          </div>
+          <div class="col-12 text-center">
+            <span class="hint-strong">Restricted to staff email accounts only</span>
+          </div>
+        </div>
+        <div class="row top-buffer">
+          <div class="col-12">
+            <amplify-authenticator>
+              <ng-template
+                amplifySlot="authenticated"
+                let-user="user"
+                let-signOut="signOut"
+              >
+                <button (click)="signOut()">Sign Out</button>
+              </ng-template>
+            </amplify-authenticator>
+          </div>
+        </div>
+
+
+  </div>
+</div>
+</div>

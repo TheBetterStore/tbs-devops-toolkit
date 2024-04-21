@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Angular SPA web application
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 5 #Max allowed for lambda@edge
+
+Parameters:
+  Environment:
+    Type: String
+    Description: eg dev, prod
+    AllowedValues:
+      - dev
+      - prod
+
+  Route53AppHostedZoneId:
+    Type: String
+
+  Route53AppDomainName:
+    Type: String
+
+  WebSubdomainName:
+    Type: String
+    Default: "toolkit"
+
+  ApiDomain:
+    Type: String
+
+Resources:
+
+  StaticWebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'devops-${Environment}-${AWS::Region}-${AWS::AccountId}-toolkit-web'
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: "Enabled"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules: # so web client can upload files?
+          -
+            AllowedHeaders:
+              - Authorization
+              - Content-Length
+            AllowedMethods:
+              - GET
+            AllowedOrigins: !Sub 'https://*.${Route53AppDomainName}'
+            MaxAge: 3000
+
+  StaticWebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticWebBucket
+      PolicyDocument:
+        Statement:
+          # this policy needs extra work for the front end to upload files and add cors rules.
+          - Action: "s3:GetObject"
+            Effect: "Allow"
+            Resource: !Sub "arn:aws:s3:::${StaticWebBucket}/*"
+            Principal:
+              CanonicalUser: !GetAtt
+                - OriginAccessIdentity
+                - S3CanonicalUserId
+          - Action: "s3:*"
+            Effect: Deny
+            Resource:
+              - !Sub "arn:aws:s3:::${StaticWebBucket}"
+              - !Sub "arn:aws:s3:::${StaticWebBucket}/*"
+            Principal: "*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
+
+  CloudfrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases: !Sub "${WebSubdomainName}.${Route53AppDomainName}"
+        Origins:
+          - DomainName: !GetAtt StaticWebBucket.DomainName
+            Id: !Sub "${AWS::StackName}-hostingS3Bucket"
+            S3OriginConfig:
+              OriginAccessIdentity: !Join
+                - ''
+                - - origin-access-identity/cloudfront/
+                  - !Ref OriginAccessIdentity
+        Enabled: true
+        Comment: !Sub ${AWS::StackName}
+        IPV6Enabled: false
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - "GET"
+            - "HEAD"
+            - "OPTIONS"
+          CachedMethods:
+            - "GET"
+            - "HEAD"
+            - "OPTIONS"
+          Compress: true
+          DefaultTTL: 86400
+          ViewerProtocolPolicy: redirect-to-https # Force https
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          TargetOriginId: !Sub "${AWS::StackName}-hostingS3Bucket"
+          ResponseHeadersPolicyId: !Ref ResponseHeadersPolicy
+
+        DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 400
+            ResponseCode: 200
+            ResponsePagePath: /
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /
+          - ErrorCachingMinTTL: 300
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /
+
+        # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
+        PriceClass: PriceClass_All
+        HttpVersion: http2
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificate
+          SslSupportMethod: 'sni-only'
+          MinimumProtocolVersion: 'TLSv1.2_2021'
+
+  OriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: "DevopsToolkit CloudFrontOriginAccessIdentityConfig"
+
+  ResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${AWS::StackName}-SecurityHeaders
+        SecurityHeadersConfig:
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Sub default-src 'none';font-src fonts.gstatic.com 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; connect-src ${ApiDomain} cognito-idp.ap-southeast-2.amazonaws.com cognito-identity.ap-southeast-2.amazonaws.com *.google-analytics.com; worker-src blob:; object-src 'none';frame-src; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Override: true
+            Preload: true
+          FrameOptions:
+            FrameOption: "DENY"
+            Override: true
+          ContentTypeOptions:
+            Override: false
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          XSSProtection:
+            ModeBlock: true
+            Override: true
+            Protection: true
+        CustomHeadersConfig:
+          Items:
+            - Header: Permissions-Policy
+              Value: accelerometer=(), ambient-light-sensor=(self), autoplay=(self), battery=(self), camera=(), display-capture=(self), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(self), gamepad=(), geolocation=(), gyroscope=(self), hid=(), identity-credentials-get=(), idle-detection=(), local-fonts=(self), magnetometer=(), microphone=(), midi=(), opt-credentials=(), payment=(), picture-in-picture=(), publickey-credentials-create=(), publickey-credentials-get=(), screen-wake-lock=(self), serial=(self), speaker-selection=(), storage-access=(), usb=(self), web-share=(), xr-spatial-tracking=()
+              Override: true
+        RemoveHeadersConfig:
+          Items:
+            - Header: Server
+
+  ACMCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+          HostedZoneId: !Ref Route53AppHostedZoneId
+
+  Route53Record:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Comment: !Sub "${AWS::StackName}-Route53Record"
+      HostedZoneId: !Sub ${Route53AppHostedZoneId}
+      Name: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CloudfrontDistribution.DomainName
+        HostedZoneId: 'Z2FDTNDATAQYW2'
+
+Outputs :
+  WebsiteURL:
+    Description: URL for website hosted on S3
+    Value: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+    Export:
+      Name: !Sub '${AWS::StackName}:CloudfrontDistribution:WebsiteURL'
+
+  S3WebsiteBucketName:
+    Description: Name of S3 bucket to hold website content
+    Value: !Ref StaticWebBucket
+    Export:
+      Name: !Sub '${AWS::StackName}:StaticWebBucket:Name'
+
+  CloudFrontDistributionID:
+    Value: !Ref CloudfrontDistribution
+    Export:
+      Name: !Sub '${AWS::StackName}:CloudfrontDistribution:Id'
+
+  CloudFrontRegionalDomainName:
+    Value: !GetAtt CloudfrontDistribution.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}:CloudfrontDistribution:RegionalDomainName'

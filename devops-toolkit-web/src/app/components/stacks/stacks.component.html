@@ -1,0 +1,67 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>Cloudformation Stacks</h1>
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h4>Stacks</h4>
+        </div>
+        <div class="card-body">
+          <span class="hint">Hint: Use Name column filter below to search for specific stacks</span>
+          <p-table
+            #dt1
+            [value]="stacks"
+            dataKey="StackName"
+            [rows]="pageSize"
+            [paginator]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+            selectionMode="single" [(selection)]="selectedStack"
+            (onRowSelect)="onRowSelect($event)" (onRowUnselect)="onRowUnselect($event)"
+            [showCurrentPageReport]="true"
+            styleClass="p-datatable-striped"
+            [globalFilterFields]="['StackName']"
+            [loading]="isLoading">
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="StackName" style="min-width: 14rem">
+                  <div class="flex align-items-center">
+                  Stack Name <p-sortIcon/>
+                  <p-columnFilter type="text" field="StackName" display="menu"></p-columnFilter>
+                  </div>
+                </th>
+                <th pSortableColumn="StackStatus" style="min-width: 14rem">Status <p-sortIcon/></th>
+                <th pSortableColumn="CreationTime" style="min-width: 14rem">Created <p-sortIcon/></th>
+                <th pSortableColumn="LastUpdatedTime" style="min-width: 14rem">Last Updated <p-sortIcon/></th>
+                <th pSortableColumn="DriftInformation.StackDriftStatus" style="min-width: 14rem">Drift <p-sortIcon/></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-stack>
+              <tr>
+                <td><a href="/stacks/{{stack.StackName}}" title="{{stack.Description}}">{{ stack.StackName }}</a></td>
+                <td><span title="{{ stack.StackStatusReason }}">{{ stack.StackStatus }}</span> </td>
+                <td>{{ stack.CreationTime }}</td>
+                <td>{{ stack.LastUpdatedTime }}</td>
+                <td *ngIf="stack.DriftInformation.StackDriftStatus == 'NOT_CHECKED'">{{ stack.DriftInformation.StackDriftStatus }}&nbsp;<button pButton class="btn btn-sm btn-outline-primary" (click)="detectDrift(stack)">Check</button></td>
+                <td *ngIf="stack.DriftInformation.StackDriftStatus == 'DRIFTED'">{{ stack.DriftInformation.StackDriftStatus }}&nbsp;<button pButton class="btn btn-sm btn-outline-primary" (click)="describeDrift(stack)">Describe</button></td>
+                <td *ngIf="stack.DriftInformation.StackDriftStatus != 'DRIFTED' && stack.DriftInformation.StackDriftStatus != 'NOT_CHECKED'">{{ stack.DriftInformation.StackDriftStatus }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+</div>
+
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>

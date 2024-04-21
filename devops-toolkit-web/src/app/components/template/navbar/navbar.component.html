@@ -1,0 +1,73 @@
+<nav *ngIf="!isLoading" class="navbar navbar-expand navbar-dark bg-dark">
+  <!-- Navbar brand -->
+  <a class="navbar-brand" href="#">
+    DevOps Toolkit &nbsp;
+    <img src="assets/images/toolbox-logo.png" height="50px" alt="toolkit"/>
+  </a>
+  <!-- Collapse button -->
+  <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <!-- Collapsible content -->
+  <div class="collapse navbar-collapse" id="navbarNav">
+
+    <!--Lef links-->
+    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+      <li class="nav-item active">
+        <a class="nav-link" href="#">Home
+          <span class="sr-only">(current)</span>
+        </a>
+      </li>
+
+      <li *ngIf="isViewer()" class="nav-item dropdown">
+        <a class="nav-link" dropdown-toggle  id="navbarDropdownAdmin"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">Maintain</a>
+        <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdownAdmin">
+          <a class="dropdown-item" [routerLink]="'/stacks'">Stacks</a>
+          <a class="dropdown-item" [routerLink]="'/parameters'" [queryParams]="{prefix: '/'}">Parameters</a>
+          <a class="dropdown-item" [routerLink]="'/compliance'">Compliance</a>
+        </div>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="about">About</a>
+      </li>
+    </ul>
+
+  </div>
+
+
+  <div *ngIf="login" class="my-0">
+    <ul class="navbar-nav mr-auto">
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" id="navbarDropdown9"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">{{region}}</a>
+        <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdown9">
+          <ng-container *ngFor="let regionItem of regionOptions; let i = index">
+            <a class="dropdown-item" (click)="onRegionChanged(regionItem)">{{regionItem}}</a>
+          </ng-container>
+
+        </div>
+      </li>
+
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" id="navbarDropdown"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">User: {{login.firstname}}</a>
+        <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdown">
+          <a class="dropdown-item" href="/logout">Logout</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- right links-->
+  <div *ngIf="!login" class="my-0">
+    <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+      <li class="nav-item dropdown">
+        <a class="nav-link" href="/login">Login/Signup</a>
+      </li>
+    </ul>
+  </div>
+</nav>

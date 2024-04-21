@@ -1,0 +1,47 @@
+<span class="info">{{infoMsg}}</span>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>{{stackName}} Drift</h1>
+    </div>
+  </div>
+  <div *ngIf="!isLoading">
+  <p-table
+    #dt1
+    [value]="drifts.StackResourceDrifts"
+    dataKey="LogicalResourceId"
+    [rows]="10"
+    styleClass="p-datatable-striped"
+    [loading]="isLoading">
+
+    <ng-template pTemplate="header">
+      <tr style="height:30px">
+        <th style="min-width:15rem">
+          <div class="flex align-items-center">
+            Logical Resource Id
+          </div>
+        </th>
+        <th style="min-width:15rem">
+          <div class="flex align-items-center">
+            Resource Type
+          </div>
+        </th>
+        <th style="min-width:15rem">
+          <div class="flex align-items-center">
+            Timestamp
+          </div>
+        </th>
+        <th>Differences</th>
+      </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-param>
+      <tr class="table-sm">
+        <td>{{ param.LogicalResourceId }}</td>
+        <td>{{ param.ResourceType }}</td>
+        <td>{{ param.Timestamp }}</td>
+        <td>{{ jsonStringify(param.PropertyDifferences) }}</td>
+      </tr>
+    </ng-template>
+  </p-table>
+  </div>
+</div>

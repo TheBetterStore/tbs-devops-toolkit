@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+      "target": "es2020",
+      "strict": true,
+      "preserveConstEnums": true,
+      "noEmit": true,
+      "sourceMap": false,
+      "module":"es2015",
+      "experimentalDecorators": true,
+      "moduleResolution":"node",
+      "esModuleInterop": true, 
+      "skipLibCheck": true,
+      "noImplicitThis": true,                   /* Raise error on 'this' expressions with an implied 'any' type. */
+      "alwaysStrict": true,                     /* Parse in strict mode and emit "use strict" for each source file. */
+      "noUnusedLocals": true,                   /* Report errors on unused locals. */
+      "noUnusedParameters": false,               /* Report errors on unused parameters. */
+      "noFallthroughCasesInSwitch": true,       /* Report errors for fallthrough cases in switch statement. */
+      "forceConsistentCasingInFileNames": true,
+    },
+    "exclude": ["node_modules", "**/*.test.ts"]
+  }

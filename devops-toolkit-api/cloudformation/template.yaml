@@ -1,0 +1,1300 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  devops-toolkit-api
+Transform:
+- AWS::Serverless-2016-10-31
+
+Parameters:
+
+  EnvironmentName:
+    Type: String
+
+  LoginCFStackName:
+    Type: String
+
+  Route53AppHostedZoneId:
+    Type: String
+
+  Route53AppDomainName:
+    Type: String
+
+  AllowedCorsDomains:
+    Type: String
+    Description: Define allowed client UI domains here. Use commas to separate if multiple.
+
+  FilteredComplianceRulesParamName:
+    Type: String
+    Description: SSM param key name which defines AWS Config compliance rules in string array
+
+Conditions:
+  IsNotProd: !Not [!Or [!Equals [Ref: EnvironmentName, "beta"], !Equals [Ref: EnvironmentName, "prod"] ]]
+
+Resources:
+
+  AuditSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${AWS::StackName}-AuditSNSTopic
+      Subscription:
+        - Protocol: lambda
+          Endpoint: !GetAtt WriteAuditFunction.Arn
+
+  SNSAuditInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref WriteAuditFunction
+      Principal: sns.amazonaws.com
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  BasicLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  CFLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-CFPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: CFPolicy
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:ListStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DetectStackDrift
+                  - cloudformation:DetectStackResourceDrift
+                  - cloudformation:DescribeStackResourceDrifts
+                Resource: "*"
+              - Sid: SNSPolicy
+                Effect: Allow
+                Action:
+                  - sns:publish
+                Resource: !Ref AuditSNSTopic
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  SSMParamsLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-SSMPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: SsmParametersPolicy
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                  - ssm:PutParameter*
+                  - ssm:DescribeParameters
+                Resource: "*"
+              - Sid: SNSPolicy
+                Effect: Allow
+                Action:
+                  - sns:publish
+                Resource: !Ref AuditSNSTopic
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ConfigServiceLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-SSMPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: ConfigPolicy
+                Effect: Allow
+                Action:
+                  - config:DescribeConfig*
+                  - config:DescribeCompliance*
+                  - config:DescribeRemediationExecutionStatus
+                  - config:GetCompliance*
+                  - config:GetResourceEvaluationSummary
+                Resource: "*"
+              - Sid: SsmParametersPolicy
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter${FilteredComplianceRulesParamName}"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  FilteredComplianceRulesParam:
+    Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    Properties:
+      Type: String
+      Name: !Sub "/${AWS::StackName}/FilteredComplianceRules"
+      Description: Blacklist (string array in JSON format) of compliance rule names to be excluded from Toolkit compliance checks
+      Value: "[]"
+
+  DescribeComplianceRulesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
+      Description: Retrieve AWS Config compliance rules.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          FILTERED_COMPLIANCE_RULES_PARAM: !Ref FilteredComplianceRulesParamName
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-compliancerules/index.ts
+
+  DescribeComplianceRulesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeComplianceRulesFunction ] ]
+      RetentionInDays: 365
+
+  DescribeComplianceRuleDetailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
+      Description: Retrieve AWS Config compliance rules.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-compliancerule-details/index.ts
+
+  DescribeComplianceRuleDetailsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeComplianceRuleDetailsFunction ] ]
+      RetentionInDays: 365
+
+  DescribeStacksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Retrieve CF stacks.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-stacks/index.ts
+
+  DescribeStacksFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeStacksFunction ] ]
+      RetentionInDays: 365
+
+  DescribeChangesetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Retrieve CF changeset.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-changeset/index.ts
+
+  DescribeChangesetFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeChangesetFunction ] ]
+      RetentionInDays: 365
+
+  ExecuteChangesetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Execute CF changeset.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/execute-changeset/index.ts
+
+  ExecuteChangesetFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref ExecuteChangesetFunction ] ]
+      RetentionInDays: 365
+
+  DescribeParametersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt SSMParamsLambdaExcecutionRole.Arn
+      Description: Retrieve SSM parameters by filters.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-parameters/index.ts
+
+  DescribeParametersFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeParametersFunction ] ]
+      RetentionInDays: 365
+
+  UpdateParameterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt SSMParamsLambdaExcecutionRole.Arn
+      Description: Update SSM parameter.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/update-parameter/index.ts
+
+  UpdateParameterFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref UpdateParameterFunction ] ]
+      RetentionInDays: 365
+
+  CreateChangesetFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Creates Cloudformation changeset to update an existing stack for modified SSM params
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/create-changeset/index.ts
+
+  CreateChangesetFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref CreateChangesetFunction ] ]
+      RetentionInDays: 365
+
+  DetectStackDriftFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Requests drift detection of a stack
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/detect-stack-drift/index.ts
+
+  DetectStackDriftFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DetectStackDriftFunction ] ]
+      RetentionInDays: 365
+
+  DescribeStackResourceDriftsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt CFLambdaExcecutionRole.Arn
+      Description: Describes drift detection of a stack
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          AUDIT_TOPIC_ARN: !Ref AuditSNSTopic
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/describe-stack-resource-drifts/index.ts
+
+  DescribeStackResourceDriftsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeStackResourceDriftsFunction ] ]
+      RetentionInDays: 365
+
+  WriteAuditFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 5
+      Role: !GetAtt BasicLambdaExcecutionRole.Arn
+      Description: Requests drift detection of a stack
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/write-audit/index.ts
+
+  WriteAuditFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref WriteAuditFunction ] ]
+      RetentionInDays: 365
+
+  CWLogGroupApiGwAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["API-Gateway-Access-Logs_", !Sub "${AWS::StackName}"]]
+      RetentionInDays: 365
+
+  DescribeStacksFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeStacksFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+
+  DescribeParametersFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeParametersFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+
+  UpdateParameterFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "UpdateParameterFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  CreateChangesetFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "CreateChangesetFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  ExecuteChangesetFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "ExecuteChangesetFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DescribeChangesetFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeChangesetFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DetectStackDriftFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DetectStackDriftFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DescribeStackDriftsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeStackResourceDriftsFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DescribeComplianceRulesFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeComplianceRulesFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DescribeComplianceRuleDetailsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "DescribeComplianceRuleDetailsFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DevopsToolkitApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      EndpointConfiguration: REGIONAL
+      MinimumCompressionSize: 0
+      TracingEnabled: true
+      DisableExecuteApiEndpoint: true
+      AccessLogSetting:
+        DestinationArn: !GetAtt CWLogGroupApiGwAccessLogs.Arn
+        Format: >
+          {"requestTimeEpoch": $context.requestTimeEpoch, "requestId":"$context.requestId",
+          "httpMethod": "$context.httpMethod", "path":"$context.path", "resourcePath": "$context.resourcePath",
+          "status": "$context.status",
+          "lambdaRequestId": "$context.integration.requestId", "integrationStatus": "$context.integration.status",
+          "xrayTraceId": "$context.xrayTraceId", "responseLatency": $context.responseLatency,
+          "integrationLatency": "$context.integrationLatency", "error": "$context.error.message",
+          "userAgent": "$context.identity.userAgent", "sourceIp": "$context.identity.sourceIp"}
+      MethodSettings:
+        - HttpMethod: "*"
+          ResourcePath: "/*"
+          DataTraceEnabled: false
+          MetricsEnabled: true # Enable detailed metrics (error 404, latence, ...)
+          ThrottlingRateLimit: 10
+          ThrottlingBurstLimit: 10
+      DefinitionBody:
+        openapi: "3.0.1"
+        info:
+          title: !Sub "${AWS::StackName}-api"
+          version: "2021-06-10T02:04:23Z"
+        paths:
+          /config-rules:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeComplianceRulesFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /config-rules/{ruleName}:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeComplianceRuleDetailsFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+          /stacks:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeStacksFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /stacks/{stackName}/drift:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeStackResourceDriftsFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            post:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DetectStackDriftFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /changesets:
+            post:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateChangesetFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /changesets/{changeSetId}:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeChangesetFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            post:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ExecuteChangesetFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /parameters:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: {}
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeParametersFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            put:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: {}
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateParameterFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+        securityDefinitions:
+          DevopsToolkitUser:
+            type: "apiKey"
+            name: "Authorization"
+            in: "header"
+            x-amazon-apigateway-authtype: "cognito_user_pools"
+            x-amazon-apigateway-authorizer:
+              providerARNs:
+                - Fn::ImportValue: !Sub ${LoginCFStackName}:UserPool:Arn
+              type: "cognito_user_pools"
+        x-amazon-apigateway-gateway-responses:
+          DEFAULT_5XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              gatewayresponse.header.Access-Control-Max-Age: "'86400'"
+              gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+          DEFAULT_4XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              gatewayresponse.header.Access-Control-Max-Age: "'86400'"
+              gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+        x-amazon-apigateway-minimum-compression-size: 0
+
+  ApiGwExecutionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub API-Gateway-Execution-Logs_${DevopsToolkitApi}/Prod
+      RetentionInDays: !If [ IsNotProd, 30, 365 ]
+
+  ApiBasePathMappingv2:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Sub "api.${Route53AppDomainName}"
+      ApiId: !Ref DevopsToolkitApi
+      Stage: !Ref DevopsToolkitApi.Stage
+      ApiMappingKey: "toolkit/v1"
+
+Outputs:
+  ApiId:
+    Description: "API Gateway Id"
+    Value: !Ref DevopsToolkitApi
+    Export:
+      Name: !Sub '${AWS::StackName}:DevopsToolkitApi:Id'
+
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for Prod stage"
+    Value: !Sub "https://${DevopsToolkitApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

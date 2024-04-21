@@ -1,0 +1,96 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div *ngIf="!isLoading" class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>Changeset - {{changeset.ChangeSetName}}</h1>
+    </div>
+  </div>
+  <div class="row top-buffer">
+    <div class="col-2">
+      <span ><h5>Status:</h5></span>
+    </div>
+    <div class="col-4">
+      <span class="text-muted"><h5>{{changeset.Status}}</h5></span>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-2">
+      <span><h5>Execution Status:</h5></span>
+    </div>
+    <div class="col-4">
+      <span class="text-muted"><h5>{{changeset.ExecutionStatus}}</h5></span>
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header"><h5>Changes</h5></div>
+        <div class="card-body">
+          <p-table
+            #dt1
+            [value]="changeset?.Changes"
+            dataKey="LogicalResourceId"
+            [rows]="pageSize"
+            styleClass="p-datatable-striped"
+            [scrollable]="true" scrollHeight="400px" [virtualScroll]="true" [virtualScrollItemSize]="46"
+            [loading]="isLoading">
+
+            <ng-template pTemplate="header">
+              <tr style="height:30px">
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    Logical Resource Id
+                  </div>
+                </th>
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    Resource Type
+                  </div>
+                </th>
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    Action
+                  </div>
+                </th>
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    Replacement
+                  </div>
+                </th>
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    Scope
+                  </div>
+                </th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-rec>
+              <tr class="table-sm">
+                <td>{{ rec.ResourceChange.LogicalResourceId }}</td>
+                <td>{{ rec.ResourceChange.ResourceType }}</td>
+                <td>{{ rec.ResourceChange.Action }}</td>
+                <td>{{ rec.ResourceChange.Replacement }}</td>
+                <td>{{ rec.ResourceChange.Scope }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-12 text-end">
+      <button pButton class="btn btn-outline-primary" (click)="onReturnClicked()">Return to Stack</button>
+      &nbsp;
+      <button *ngIf="changeset.ExecutionStatus!='AVAILABLE'" pButton class="btn btn-success" disabled>Execute</button>
+      <button *ngIf="changeset.ExecutionStatus=='AVAILABLE'" pButton class="btn btn-success" (click)="onExecuteClicked()">Execute</button>
+    </div>
+  </div>
+</div>
+
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>

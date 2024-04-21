@@ -1,0 +1,64 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>AWS Config Rule Resources</h1>
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-12">
+      <div *ngIf="!isLoading" class="card">
+        <div class="card-header">
+          <h4>{{ruleName}}</h4>
+        </div>
+        <div class="card-body">
+          <p-table
+            #dt1
+            [value]="resources"
+            [rows]="pageSize"
+            [paginator]="true"
+            selectionMode="single"
+            [showCurrentPageReport]="true"
+            styleClass="p-datatable-striped"
+            [globalFilterFields]="['ComplianceType', 'EvaluationResultIdentifier.EvaluationResultQualifier.EvaluationMode',
+            'EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId', 'EvaluationResultIdentifier.EvaluationResultQualifier.ResourceType']"
+            [loading]="isLoading">
+
+            <ng-template pTemplate="header">
+              <tr style="height:30px">
+                <th pSortableColumn="ComplianceType" scope="col" style="min-width:15rem">Compliance Type <p-sortIcon/>
+                  <p-columnFilter type="text" field="ComplianceType" display="menu"></p-columnFilter>
+                </th>
+                <th pSortableColumn="EvaluationResultIdentifier.EvaluationResultQualifier.EvaluationMode" scope="col" style="min-width:15rem">Evaluation Mode <p-sortIcon/>
+                  <p-columnFilter type="text" field="EvaluationResultIdentifier.EvaluationResultQualifier.EvaluationMode" display="menu"></p-columnFilter>
+                </th>
+                <th pSortableColumn="EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId" scope="col" style="min-width:15rem">Resource Name <p-sortIcon/>
+                  <p-columnFilter type="text" field="EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId" display="menu"></p-columnFilter>
+                </th>
+                <th pSortableColumn="EvaluationResultIdentifier.EvaluationResultQualifier.ResourceType" scope="col">Resource Type <p-sortIcon/>
+                  <p-columnFilter type="text" field="EvaluationResultIdentifier.EvaluationResultQualifier.ResourceType" display="menu"></p-columnFilter>
+                </th>
+                <th></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-resource>
+              <tr class="table-sm" [pSelectableRow]="selectedResource">
+                <td>{{ resource.ComplianceType }}</td>
+                <td>{{ resource.EvaluationResultIdentifier.EvaluationResultQualifier.EvaluationMode }}</td>
+                <td>{{ resource.EvaluationResultIdentifier.EvaluationResultQualifier?.ResourceId }}</td>
+                <td>{{ resource.EvaluationResultIdentifier.EvaluationResultQualifier?.ResourceType }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>

@@ -1,0 +1,98 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div class="container page">
+
+  <div class="row text-center">
+    <div *ngIf="isViewer()" class="col-12">
+      <h1 class="page-title">DevOps Toolkit</h1>
+    </div>
+    <div *ngIf="!isViewer()" class="col-12">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1 class="page-title">Logged in successfully, new user pending authorisation</h1>
+        </div>
+      </div>
+      <div class="row top-buffer-x2">
+        <div class="col-12 text-center">
+          <h5 class="page-title">Please consult with a System Administrator to be provided with appropriate permissions to the system.</h5>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isViewer()" class="row">
+    <div class="col-lg-2"></div>
+    <div class="col-lg-8 col-12">
+      <p class="top-buffer-x2">
+        IT administration site for performing devops functions on AWS.
+      </p>
+      <div class="card-group top-buffer">
+
+        <div class="card sidemargin">
+          <div class="card-header h-100">
+            <h5>Stacks</h5>
+            <div>
+              <a href="#" [routerLink]="'/stacks'">
+                <img class="card-img thumbnail" src="/assets/images/stacks.jpg" height="140px" />
+              </a>
+            </div>
+
+            <div class="card-body small">
+              <span>Deployed AWS Cloudformation stacks.</span>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card sidemargin">
+          <div class="card-header h-100">
+            <h5>Parameters</h5>
+            <div>
+              <a href="#" [routerLink]="'/parameters'" [queryParams]="{prefix: '/'}" >
+                <img class="card-img-top thumbnail" src="/assets/images/parameters.jpg" height="140px" />
+              </a>
+            </div>
+            <div class="card-body small">
+              <span>Manage SSM Parameter Store parameters.</span>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="card sidemargin">
+          <div class="card-header h-100">
+            <h5>Error Mgmt</h5>
+            <div>
+              <a href="#" [routerLink]="'/errors'">
+                <img class="card-img-top thumbnail"  src="/assets/images/errors.jpg" height="140px" />
+              </a>
+            </div>
+            <div class="card-body small">
+              <span>Manage application errors.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card sidemargin">
+          <div class="card-header h-100">
+            <h5>AWS Compliance</h5>
+            <div>
+              <a href="#" [routerLink]="'/compliance'">
+                <img class="card-img-top thumbnail"  src="/assets/images/check-mark.png" height="140px" />
+              </a>
+            </div>
+            <div class="card-body small">
+              <span>View/manage AWS Compliance of deployed resources.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
