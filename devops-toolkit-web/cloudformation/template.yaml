@@ -198,7 +198,7 @@ Resources:
     Properties:
       Comment: !Sub "${AWS::StackName}-Route53Record"
       HostedZoneId: !Sub ${Route53AppHostedZoneId}
-      Name: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+      Name: !Sub ${WebSubdomainName}.${Route53AppDomainName}
       Type: A
       AliasTarget:
         DNSName: !GetAtt CloudfrontDistribution.DomainName
