@@ -6,7 +6,7 @@ Transform:
   - AWS::Serverless-2016-10-31
 
 Parameters:
-  EnvironmentName:
+  Environment:
     Type: String
 
   Route53CFStackName:

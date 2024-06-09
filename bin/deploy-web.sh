@@ -15,7 +15,7 @@ cd ${workspaceDir}/devops-toolkit-web
 sam build --template-file ./cloudformation/template.yaml
 sam deploy --stack-name $stackName $noExecuteChangeset \
 --parameter-overrides \
-EnvironmentName=${environmentName} \
+Environment=${environmentName} \
 Route53AppHostedZoneId=$route53AppHostedZoneId \
 Route53AppDomainName=$route53AppDomainName \
 ApiDomain=${apiDomain} \
