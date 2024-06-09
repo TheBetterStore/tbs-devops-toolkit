@@ -13,8 +13,6 @@ Parameters:
     AllowedValues:
       - dev
       - prod
-  EnvironmentName:
-    Type: String
 
   Route53AppZoneId:
     Type: String
@@ -42,7 +40,6 @@ Parameters:
     Type: String
 
 Resources:
-
 
   UserPool:
     Type: AWS::Cognito::UserPool

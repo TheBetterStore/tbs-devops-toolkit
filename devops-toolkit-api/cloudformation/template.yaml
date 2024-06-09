@@ -6,7 +6,7 @@ Transform:
 
 Parameters:
 
-  EnvironmentName:
+  Environment:
     Type: String
 
   LoginCFStackName:
@@ -25,9 +25,6 @@ Parameters:
   FilteredComplianceRulesParamName:
     Type: String
     Description: SSM param key name which defines AWS Config compliance rules in string array
-
-Conditions:
-  IsNotProd: !Not [!Or [!Equals [Ref: EnvironmentName, "beta"], !Equals [Ref: EnvironmentName, "prod"] ]]
 
 Resources:
 
@@ -1278,7 +1275,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub API-Gateway-Execution-Logs_${DevopsToolkitApi}/Prod
-      RetentionInDays: !If [ IsNotProd, 30, 365 ]
+      RetentionInDays: 30
 
   ApiBasePathMappingv2:
     Type: AWS::ApiGatewayV2::ApiMapping

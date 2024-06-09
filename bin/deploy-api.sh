@@ -29,7 +29,7 @@ sam build --template-file ./cloudformation/template.yaml --base-dir .
 sam deploy --stack-name $stackName \
 --resolve-s3 \
 --parameter-overrides \
-EnvironmentName=${environmentName} \
+Environment=${environmentName} \
 AllowedCorsDomains=$allowedCorsDomains \
 Route53AppHostedZoneId=$route53AppHostedZoneId \
 Route53AppDomainName=$route53AppDomainName \
