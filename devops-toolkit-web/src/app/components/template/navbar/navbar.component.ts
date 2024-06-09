@@ -19,7 +19,7 @@ export class NavbarComponent extends BaseComponent {
 
   region: string;
 
-  regionOptions: string[] = ["ap-southeast-2", "us-east-1", "eu-west-1"];
+  regionOptions: string[] = ["ap-southeast-2", "us-east-1"];
 
   constructor(private ref: ChangeDetectorRef,
               authenticationService: AuthenticationService,

@@ -56,7 +56,8 @@ Resources:
               - Content-Length
             AllowedMethods:
               - GET
-            AllowedOrigins: !Sub 'https://*.${Route53AppDomainName}'
+            AllowedOrigins:
+              - !Sub 'https://*.${Route53AppDomainName}'
             MaxAge: 3000
 
   StaticWebBucketPolicy:
@@ -87,7 +88,8 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Aliases: !Sub "${WebSubdomainName}.${Route53AppDomainName}"
+        Aliases:
+          - !Sub "${WebSubdomainName}.${Route53AppDomainName}"
         Origins:
           - DomainName: !GetAtt StaticWebBucket.DomainName
             Id: !Sub "${AWS::StackName}-hostingS3Bucket"
@@ -185,10 +187,10 @@ Resources:
   ACMCertificate:
     Type: AWS::CertificateManager::Certificate
     Properties:
-      DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+      DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}
       ValidationMethod: DNS
       DomainValidationOptions:
-        - DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}"
+        - DomainName: !Sub ${WebSubdomainName}.${Route53AppDomainName}
           HostedZoneId: !Ref Route53AppHostedZoneId
 
   Route53Record:
