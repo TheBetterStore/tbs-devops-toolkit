@@ -12,9 +12,6 @@ Parameters:
   LoginCFStackName:
     Type: String
 
-  Route53AppHostedZoneId:
-    Type: String
-
   Route53AppDomainName:
     Type: String
 
@@ -167,15 +164,6 @@ Resources:
                 Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter${FilteredComplianceRulesParamName}"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-
-  FilteredComplianceRulesParam:
-    Type: AWS::SSM::Parameter
-    DeletionPolicy: Retain
-    Properties:
-      Type: String
-      Name: !Sub "/${AWS::StackName}/FilteredComplianceRules"
-      Description: Blacklist (string array in JSON format) of compliance rule names to be excluded from Toolkit compliance checks
-      Value: "[]"
 
   DescribeComplianceRulesFunction:
     Type: AWS::Serverless::Function

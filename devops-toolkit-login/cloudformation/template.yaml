@@ -14,9 +14,6 @@ Parameters:
       - dev
       - prod
 
-  Route53AppZoneId:
-    Type: String
-
   Route53AppDomainName:
     Type: String
 
@@ -123,8 +120,10 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       ClientName: !Sub "${AWS::StackName}l-webclient"
-      CallbackURLs: !Sub "https://${WebSubdomainName}.${Route53AppDomainName}/"
-      LogoutURLs: !Sub "https://${WebSubdomainName}.${Route53AppDomainName}/logout"
+      CallbackURLs:
+        - !Sub "https://${WebSubdomainName}.${Route53AppDomainName}/"
+      LogoutURLs:
+        - !Sub "https://${WebSubdomainName}.${Route53AppDomainName}/logout"
       TokenValidityUnits:
         AccessToken: minutes
         IdToken: minutes
