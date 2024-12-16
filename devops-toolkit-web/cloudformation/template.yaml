@@ -178,7 +178,7 @@ Resources:
         CustomHeadersConfig:
           Items:
             - Header: Permissions-Policy
-              Value: accelerometer=(), ambient-light-sensor=(self), autoplay=(self), battery=(self), camera=(), display-capture=(self), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(self), gamepad=(), geolocation=(), gyroscope=(self), hid=(), identity-credentials-get=(), idle-detection=(), local-fonts=(self), magnetometer=(), microphone=(), midi=(), opt-credentials=(), payment=(), picture-in-picture=(), publickey-credentials-create=(), publickey-credentials-get=(), screen-wake-lock=(self), serial=(self), speaker-selection=(), storage-access=(), usb=(self), web-share=(), xr-spatial-tracking=()
+              Value: accelerometer=(),autoplay=(self), camera=(), display-capture=(self), encrypted-media=(), fullscreen=(self), gamepad=(), geolocation=(), gyroscope=(self), hid=(), identity-credentials-get=(), idle-detection=(), local-fonts=(self), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-create=(), publickey-credentials-get=(), screen-wake-lock=(self), serial=(self), storage-access=(), usb=(self), web-share=(), xr-spatial-tracking=()
               Override: true
         RemoveHeadersConfig:
           Items:
