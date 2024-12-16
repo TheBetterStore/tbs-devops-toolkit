@@ -7,7 +7,7 @@ import {Logger} from '../../../infrastructure/logger';
 import {HttpUtils} from '../../../infrastructure/http-utils';
 import {AuthUtils} from '../../../infrastructure/auth-utils';
 import {ICFClient} from '../../../infrastructure/interfaces/cf-client.interface';
-import {DescribeStacksCommandInput} from '@aws-sdk/client-cloudformation';
+import {DescribeStacksCommandInput, DescribeStacksCommandOutput} from '@aws-sdk/client-cloudformation';
 import {InvalidDataError} from '../../../domain/models/invalid-data-error';
 
 console.log('INFO - lambda is cold-starting.');
@@ -27,7 +27,6 @@ exports.handler = async (event: APIGatewayEvent) => {
 
   let region = '';
   const q: DescribeStacksCommandInput = {
-
   };
 
   try {
@@ -43,19 +42,25 @@ exports.handler = async (event: APIGatewayEvent) => {
       q.StackName = params['stackName'];
     }
 
-    if (params['nextToken']) {
-      q.NextToken = params['nextToken'];
-    }
-
     region = params.region + '';
     console.log('Using params:', q);
 
     const client = container.get<ICFClient>(TYPES.ICFClient);
-    const s = await client.describeStacks(region, q);
 
-    Logger.debug('Result:', s);
+    let stacks: any[] = [];
+    let nextToken: string | null | undefined = null;
+    do {
+      const s: DescribeStacksCommandOutput = await client.describeStacks(region, q);
+      stacks = stacks.concat(s.Stacks);
+      nextToken = s.NextToken;
+      q.NextToken = nextToken;
+      console.log('Using added stacks:', s.Stacks?.length);
+      console.log(nextToken);
+    } while (nextToken);
 
-    const response = HttpUtils.buildJsonResponse(200, s, event?.headers?.origin + '');
+    Logger.debug('Result:', stacks);
+
+    const response = HttpUtils.buildJsonResponse(200, stacks, event?.headers?.origin + '');
     Logger.info('Exiting handler');
     return response;
   } catch (e: any) {
