@@ -71,9 +71,8 @@ export class StacksComponent {
     this.stackService.getStacks(stackName, nextToken)
       .subscribe(
         p => {
-          console.log(p);
-          self.stacks = p.Stacks;
-          self.nextToken = p.NextToken;
+          // console.log(p);
+          self.stacks = p;
           self.errorMsg = '';
           self.isLoading = false;
         },
