@@ -162,8 +162,43 @@ Resources:
                 Action:
                   - ssm:GetParameter*
                 Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter${FilteredComplianceRulesParamName}"
+              - Sid: DynamoDbPolicy
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt ConfigNonCompliantRuleTable.Arn
+
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ConfigNonCompliantRuleTable:
+    Type: AWS::DynamoDB::Table
+    #    DeletionPolicy: Retain
+    #    UpdateReplacePolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "Rule"
+          AttributeType: "S"
+        - AttributeName: "ResourceName"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "Rule"
+          KeyType: "HASH"
+        - AttributeName: "ResourceName"
+          KeyType: "RANGE"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
 
   DescribeComplianceRulesFunction:
     Type: AWS::Serverless::Function
@@ -186,6 +221,7 @@ Resources:
           DEBUG_ENABLED: true
           ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
           FILTERED_COMPLIANCE_RULES_PARAM: !Ref FilteredComplianceRulesParamName
+          NONCOMPLIANCE_TABLE_NAME: !Ref ConfigNonCompliantRuleTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -221,6 +257,7 @@ Resources:
         Variables:
           DEBUG_ENABLED: true
           ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          NONCOMPLIANCE_TABLE_NAME: !Ref ConfigNonCompliantRuleTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
