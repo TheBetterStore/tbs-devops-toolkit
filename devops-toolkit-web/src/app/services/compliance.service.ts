@@ -41,6 +41,19 @@ export class ComplianceService extends BaseService {
       .pipe(catchError(this.handleError));
     return results$;
   }
+
+  resetNonComplianceRuleCounts() {
+    const region = this.regionService.getRegion();
+    let url = `${environment.apiBaseUrl}/v1/config-rules/non-compliant/counts?region=${region}`;
+
+    console.log('Calling POST on url:' + url);
+    const res$ = this.http
+      .post(url, {headers: {
+          skip: 'true'
+        }})
+      .pipe(catchError(this.handleError));
+    return res$;
+  }
 }
 
 function mapRules(r: any) {

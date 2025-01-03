@@ -11,7 +11,7 @@ import {IAppComplianceService} from '../../services/app-compliance-service.inter
 
 console.log('INFO - lambda is cold-starting.');
 exports.handler = async (event: APIGatewayEvent) => {
-  Logger.info('Entered describe-compliancerules handler', event);
+  Logger.info('Entered reset-noncompliancerulecounts handler', event);
 
   if (!event.requestContext || !event.requestContext.authorizer) {
     return HttpUtils.buildJsonResponse(400, {message: 'Missing authorizer'}, event?.headers?.origin + '');
@@ -39,11 +39,11 @@ exports.handler = async (event: APIGatewayEvent) => {
     region = queryParams.region;
 
     const svc = container.get<IAppComplianceService>(TYPES.IAppComplianceService);
-    const filteredResults = await svc.retrieveComplianceRules(region);
+    const result = await svc.resetNoncomplianceCounts(region);
 
-    Logger.debug('Filtered rules:', filteredResults);
+    Logger.debug('Result:', result);
 
-    const response = HttpUtils.buildJsonResponse(200, filteredResults, event?.headers?.origin + '');
+    const response = HttpUtils.buildJsonResponse(200, result, event?.headers?.origin + '');
     Logger.info('Exiting handler');
     return response;
   } catch (e: any) {

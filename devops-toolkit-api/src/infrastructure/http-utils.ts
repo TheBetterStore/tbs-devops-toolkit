@@ -18,6 +18,9 @@ export class HttpUtils {
       'Access-Control-Max-Age': 86400,
       'Strict-Transport-Security': 'max-age=31536000; includeSubdomains; preload',
     };
+    console.log('originHeader', originHeader);
+    console.log('HttpUtils.ALLOWED_CORS_DOMAINS', HttpUtils.ALLOWED_CORS_DOMAINS);
+
     if (HttpUtils.ALLOWED_CORS_DOMAINS.includes(originHeader)) {
       headers['Access-Control-Allow-Origin'] = originHeader;
     }

@@ -14,6 +14,8 @@ import {ActivatedRoute, Router, RouterLink} from "@angular/router";
 import {MessageService} from "primeng/api";
 import {ComplianceService} from "../../services/compliance.service";
 import {IComplianceByConfigRule} from "../../../models/compliance-byconfig-rule";
+import {BaseComponent} from "../base.component";
+import {AuthenticationService} from "../../services/authentication.service";
 
 @Component({
   selector: 'app-compliance',
@@ -23,7 +25,7 @@ import {IComplianceByConfigRule} from "../../../models/compliance-byconfig-rule"
   templateUrl: './compliance.component.html',
   styleUrl: './compliance.component.scss'
 })
-export class ComplianceComponent {
+export class ComplianceComponent extends BaseComponent {
   isLoading = false;
   errorMsg: string = "";
   infoMsg: string = "";
@@ -34,8 +36,10 @@ export class ComplianceComponent {
   rules: IComplianceByConfigRule[];
   selectedRule: any;
 
-  constructor(private complianceService: ComplianceService, private router: Router, private route: ActivatedRoute,
+  constructor(authenticationService: AuthenticationService, private complianceService: ComplianceService,
+              private router: Router, private route: ActivatedRoute,
               private messageService: MessageService) {
+    super(authenticationService);
     this.rules = [];
 
     this.loadRules(false);
@@ -72,5 +76,30 @@ export class ComplianceComponent {
 
   JSON() {
     return JSON.stringify(this.rules, null, 2);
+  }
+
+  resetCounts() {
+    const self = this;
+    this.complianceService.resetNonComplianceRuleCounts()
+      .subscribe(
+        p => {
+          console.log(p);
+          self.errorMsg = '';
+          self.isLoading = false;
+        },
+        e => {
+          console.log(e);
+          self.messageService.add({
+            severity: 'error',
+            summary: 'Rule counts reset failed',
+            detail: e.message,
+            life: 5000
+          });
+          self.errorMsg = e.message;
+          self.isLoading = false;
+        },
+        () => {
+        }
+      );
   }
 }
