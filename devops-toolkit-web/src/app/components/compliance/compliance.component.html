@@ -52,7 +52,7 @@
                 <td><a [routerLink]="['/compliance', rule.ConfigRuleName]">{{ rule.ConfigRuleName }}</a></td>
                 <td>{{ rule.Compliance.ComplianceType }}</td>
                 <td>{{ rule.Compliance.ComplianceContributorCount?.CappedCount }}</td>
-                <td>{{ rule.PreviousNoncomplianceCount}}</td>
+                <td title="{{rule.PreviousUpdatedTime}}">{{ rule.PreviousNoncomplianceCount}}</td>
                 <td>{{ rule.Compliance.ComplianceContributorCount?.CappedCount -  rule.PreviousNoncomplianceCount}}</td>
                 <td>{{ rule.Compliance.ComplianceContributorCount?.CapExceeded }}</td>
               </tr>
