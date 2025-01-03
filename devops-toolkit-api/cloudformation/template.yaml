@@ -172,15 +172,31 @@ Resources:
                   - dynamodb:Scan
                   - dynamodb:Query
                   - dynamodb:UpdateItem
-                Resource: !GetAtt ConfigNonCompliantRuleTable.Arn
+                Resource:
+                  - !GetAtt ConfigNonCompliantRuleTable.Arn
+                  - !GetAtt ConfigNonCompliantRuleCountsTable.Arn
 
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
+  ConfigNonCompliantRuleCountsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "Rule"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "Rule"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
   ConfigNonCompliantRuleTable:
     Type: AWS::DynamoDB::Table
-    #    DeletionPolicy: Retain
-    #    UpdateReplacePolicy: Retain
     Properties:
       AttributeDefinitions:
         - AttributeName: "Rule"
@@ -199,6 +215,42 @@ Resources:
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: false
 
+  ResetNonComplianceRuleCountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
+      Description: Retrieve AWS Config compliance rules.
+      Environment:
+        Variables:
+          DEBUG_ENABLED: true
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          FILTERED_COMPLIANCE_RULES_PARAM: !Ref FilteredComplianceRulesParamName
+          NONCOMPLIANCE_COUNTS_TABLE_NAME: !Ref ConfigNonCompliantRuleCountsTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/reset-noncompliancerulecounts/index.ts
+
+  ResetNonComplianceRuleCountsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref ResetNonComplianceRuleCountsFunction ] ]
+      RetentionInDays: 365
 
   DescribeComplianceRulesFunction:
     Type: AWS::Serverless::Function
@@ -222,6 +274,7 @@ Resources:
           ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
           FILTERED_COMPLIANCE_RULES_PARAM: !Ref FilteredComplianceRulesParamName
           NONCOMPLIANCE_TABLE_NAME: !Ref ConfigNonCompliantRuleTable
+          NONCOMPLIANCE_COUNTS_TABLE_NAME: !Ref ConfigNonCompliantRuleCountsTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -258,6 +311,7 @@ Resources:
           DEBUG_ENABLED: true
           ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
           NONCOMPLIANCE_TABLE_NAME: !Ref ConfigNonCompliantRuleTable
+          NONCOMPLIANCE_COUNTS_TABLE_NAME: !Ref ConfigNonCompliantRuleCountsTable
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -691,6 +745,15 @@ Resources:
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
       SourceAccount: !Sub ${AWS::AccountId}
 
+  ResetComplianceRuleCountsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "ResetNonComplianceRuleCountsFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
   DevopsToolkitApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -699,6 +762,7 @@ Resources:
       MinimumCompressionSize: 0
       TracingEnabled: true
       DisableExecuteApiEndpoint: true
+      OpenApiVersion: 3.0.1
       AccessLogSetting:
         DestinationArn: !GetAtt CWLogGroupApiGwAccessLogs.Arn
         Format: >
@@ -716,6 +780,7 @@ Resources:
           MetricsEnabled: true # Enable detailed metrics (error 404, latence, ...)
           ThrottlingRateLimit: 10
           ThrottlingBurstLimit: 10
+          LoggingLevel: ERROR
       DefinitionBody:
         openapi: "3.0.1"
         info:
@@ -744,6 +809,72 @@ Resources:
               x-amazon-apigateway-integration:
                 httpMethod: "POST"
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DescribeComplianceRulesFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /config-rules/non-compliant/counts:
+            post:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  schema:
+                    $ref: "#/definitions/Empty"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ResetNonComplianceRuleCountsFunction.Arn}:prod/invocations"
                 responses:
                   default:
                     statusCode: "200"
