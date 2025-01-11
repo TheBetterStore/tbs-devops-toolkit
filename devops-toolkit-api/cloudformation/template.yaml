@@ -23,6 +23,16 @@ Parameters:
     Type: String
     Description: SSM param key name which defines AWS Config compliance rules in string array
 
+  AppLoggingLevel:
+    Type: String
+    AllowedValues: [TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+    Default: INFO
+
+  SystemLogLevel:
+    Type: String
+    AllowedValues: [DEBUG, INFO, WARN]
+    Default: INFO
+
 Resources:
 
   AuditSNSTopic:
@@ -229,6 +239,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref ResetNonComplianceRuleCountsFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
       Description: Retrieve AWS Config compliance rules.
       Environment:
@@ -249,7 +264,7 @@ Resources:
   ResetNonComplianceRuleCountsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref ResetNonComplianceRuleCountsFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", ResetNonComplianceRuleCountsFunction ] ]
       RetentionInDays: 365
 
   DescribeComplianceRulesFunction:
@@ -266,6 +281,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeComplianceRulesFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
       Description: Retrieve AWS Config compliance rules.
       Environment:
@@ -287,7 +307,7 @@ Resources:
   DescribeComplianceRulesFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeComplianceRulesFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeComplianceRulesFunction ] ]
       RetentionInDays: 365
 
   DescribeComplianceRuleDetailsFunction:
@@ -298,12 +318,17 @@ Resources:
       Runtime: nodejs18.x
       Architectures:
         - x86_64
-      MemorySize: 128
+      MemorySize: 256
       Timeout: 100
       AutoPublishAlias: prod
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeComplianceRuleDetailsFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt ConfigServiceLambdaExcecutionRole.Arn
       Description: Retrieve AWS Config compliance rules.
       Environment:
@@ -324,7 +349,7 @@ Resources:
   DescribeComplianceRuleDetailsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeComplianceRuleDetailsFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeComplianceRuleDetailsFunction ] ]
       RetentionInDays: 365
 
   DescribeStacksFunction:
@@ -341,6 +366,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeStacksFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Retrieve CF stacks.
       Environment:
@@ -360,7 +390,7 @@ Resources:
   DescribeStacksFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeStacksFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeStacksFunction ] ]
       RetentionInDays: 365
 
   DescribeChangesetFunction:
@@ -377,6 +407,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeChangesetFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Retrieve CF changeset.
       Environment:
@@ -396,7 +431,7 @@ Resources:
   DescribeChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeChangesetFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeChangesetFunction ] ]
       RetentionInDays: 365
 
   ExecuteChangesetFunction:
@@ -413,6 +448,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref ExecuteChangesetFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Execute CF changeset.
       Environment:
@@ -432,7 +472,7 @@ Resources:
   ExecuteChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref ExecuteChangesetFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", ExecuteChangesetFunction ] ]
       RetentionInDays: 365
 
   DescribeParametersFunction:
@@ -449,6 +489,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeParametersFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt SSMParamsLambdaExcecutionRole.Arn
       Description: Retrieve SSM parameters by filters.
       Environment:
@@ -468,7 +513,7 @@ Resources:
   DescribeParametersFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeParametersFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeParametersFunction ] ]
       RetentionInDays: 365
 
   UpdateParameterFunction:
@@ -485,6 +530,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref UpdateParameterFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt SSMParamsLambdaExcecutionRole.Arn
       Description: Update SSM parameter.
       Environment:
@@ -504,7 +554,7 @@ Resources:
   UpdateParameterFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref UpdateParameterFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", UpdateParameterFunction ] ]
       RetentionInDays: 365
 
   CreateChangesetFunction:
@@ -521,6 +571,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref CreateChangesetFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Creates Cloudformation changeset to update an existing stack for modified SSM params
       Environment:
@@ -540,7 +595,7 @@ Resources:
   CreateChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref CreateChangesetFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", CreateChangesetFunction ] ]
       RetentionInDays: 365
 
   DetectStackDriftFunction:
@@ -557,6 +612,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DetectStackDriftFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Requests drift detection of a stack
       Environment:
@@ -576,7 +636,7 @@ Resources:
   DetectStackDriftFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DetectStackDriftFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DetectStackDriftFunction ] ]
       RetentionInDays: 365
 
   DescribeStackResourceDriftsFunction:
@@ -593,6 +653,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref DescribeStackResourceDriftsFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Describes drift detection of a stack
       Environment:
@@ -612,7 +677,7 @@ Resources:
   DescribeStackResourceDriftsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref DescribeStackResourceDriftsFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeStackResourceDriftsFunction ] ]
       RetentionInDays: 365
 
   WriteAuditFunction:
@@ -629,6 +694,11 @@ Resources:
       DeploymentPreference:
         Type: AllAtOnce
       ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref WriteAuditFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt BasicLambdaExcecutionRole.Arn
       Description: Requests drift detection of a stack
       Environment:
@@ -646,7 +716,7 @@ Resources:
   WriteAuditFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", !Ref WriteAuditFunction ] ]
+      LogGroupName: !Join [ '', [ "/aws/lambda/", WriteAuditFunction ] ]
       RetentionInDays: 365
 
   CWLogGroupApiGwAccessLogs:
