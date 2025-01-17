@@ -1562,7 +1562,7 @@ Resources:
                 - NotStatement:
                     Statement:
                       GeoMatchStatement:
-                        CountryCodes: [AR,AT,AU,BE,BR,CA,CH,DE,DK,ES,FR,GB,IE,IN,IT,JP,LK,MY,NO,NZ,PH,PL,PT,SE,SG,TH,TW,US,ZA] # Geo-blocking to sample countries
+                        CountryCodes: [NZ,AU] # Geo-blocking to sample countries (max 2)
                 - NotStatement:
                     Statement:
                       IPSetReferenceStatement:
