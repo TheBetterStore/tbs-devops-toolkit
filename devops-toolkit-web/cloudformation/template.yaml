@@ -98,6 +98,10 @@ Resources:
                 - ''
                 - - origin-access-identity/cloudfront/
                   - !Ref OriginAccessIdentity
+        Restrictions:
+          GeoRestriction:
+            Locations: [AR,AT,AU,BE,BR,CA,CH,DE,DK,ES,FR,GB,IE,IN,IT,JP,LK,MY,NO,NZ,PH,PL,PT,SE,SG,TH,TW,US,ZA] # Geo-blocking to sample countries
+            RestrictionType: whitelist
         Enabled: true
         Comment: !Sub ${AWS::StackName}
         IPV6Enabled: false
