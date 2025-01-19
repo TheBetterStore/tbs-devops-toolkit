@@ -104,6 +104,11 @@ Resources:
                   - cloudformation:DetectStackResourceDrift
                   - cloudformation:DescribeStackResourceDrifts
                 Resource: "*"
+              - Sid: SsmParametersPolicy
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                Resource: "*"
               - Sid: SNSPolicy
                 Effect: Allow
                 Action:
