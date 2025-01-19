@@ -99,9 +99,9 @@ export class StackComponent extends BaseComponent {
     this.stackService.getStacks(stackName, "")
       .subscribe(
         p => {
-          if(p.Stacks && p.Stacks.length == 1) {
-            self.stack = p.Stacks[0];
-            //console.log(self.stack);
+          if(p && p.length == 1) {
+            self.stack = p[0];
+            // console.log(self.stack);
             self.securityTag = "";
             const tags = self.stack?.Tags;
             const securityTag = tags.find((x: { Key: string; }) => x.Key == 'security');

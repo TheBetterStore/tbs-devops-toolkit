@@ -1,18 +1,17 @@
 #!/bin/bash
 
-noExecuteChangeset=""
+samDeployBucket="MyBucketName"
+stackName="MyCfnStackName"
+environmentName="prod"
+route53AppHostedZoneId="myRoute53HostedZoneId"
+route53AppDomainName="myroute53.domain.name"
+region="my aws region"
+allowedCorsDomains="https://toolkit.${route53AppDomainName},http://localhost:4200"
+loginCFStackName="tbs-devops-toolkit-login-${environment}"
 
-if [ "${isNoExecuteChangeset}" = "true" ]; then
-echo "Setting no-execute-changeset."
-noExecuteChangeset="--no-execute-changeset"
-else
-echo "no-execute-changeset is false"
-fi
+cd ./devops-toolkit-api
 
-echo Running against environment: ${environment}, account: $awsaccount_target
-cd ${workspaceDir}/devops-toolkit-api
-
-# Initialising params
+# Initialising params in regions where I wish to monitor compliance rules
 aws ssm put-parameter --name "/$stackName/FilteredComplianceRules" --type String --no-overwrite --region ap-southeast-2 \
 --value "[]" 2> /dev/null
 
@@ -21,8 +20,6 @@ aws ssm put-parameter --name "/$stackName/FilteredComplianceRules" --type String
 
 aws ssm put-parameter --name "/$stackName/FilteredComplianceRules" --type String --no-overwrite --region eu-west-1 \
 --value "[]" 2> /dev/null
-
-echo Running against region: $region, environment: $environment, account: $awsaccount_target, noexecutechangset: $noExecuteChangeset
 
 sam build --template-file ./cloudformation/template.yaml --base-dir .
 
@@ -36,4 +33,5 @@ Route53AppDomainName=$route53AppDomainName \
 LoginCFStackName=$loginCFStackName \
 FilteredComplianceRulesParamName="/$stackName/FilteredComplianceRules" \
 --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM --region $region --no-confirm-changeset --no-fail-on-empty-changeset \
---tags stackname=$stackName environment=$environmentName
+--tags stackname=$stackName environment=$environmentName \
+--profile thebetterstore

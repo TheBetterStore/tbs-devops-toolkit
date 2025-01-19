@@ -33,6 +33,11 @@ Parameters:
     AllowedValues: [DEBUG, INFO, WARN]
     Default: INFO
 
+  WhitelistIPs:
+    Type: CommaDelimitedList
+    Description: Allow specific IP ranges outside of WAF Geoblocked zone
+    Default: "127.0.0.1/32" # A dummy value
+
 Resources:
 
   AuditSNSTopic:
@@ -98,6 +103,11 @@ Resources:
                   - cloudformation:DetectStackDrift
                   - cloudformation:DetectStackResourceDrift
                   - cloudformation:DescribeStackResourceDrifts
+                Resource: "*"
+              - Sid: SsmParametersPolicy
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter*
                 Resource: "*"
               - Sid: SNSPolicy
                 Effect: Allow
@@ -203,7 +213,9 @@ Resources:
       #        ReadCapacityUnits: 1
       #        WriteCapacityUnits: 1
       PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: false
+        PointInTimeRecoveryEnabled: false # Set to true if protection is needed
+#      SSESpecification: # Enable for production environments
+#        SSEEnabled: true
 
   ConfigNonCompliantRuleTable:
     Type: AWS::DynamoDB::Table
@@ -223,7 +235,9 @@ Resources:
       #        ReadCapacityUnits: 1
       #        WriteCapacityUnits: 1
       PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: false
+        PointInTimeRecoveryEnabled: false # Set to true if protection is needed
+#      SSESpecification: # Enable for production environments
+#        SSEEnabled: true
 
   ResetNonComplianceRuleCountsFunction:
     Type: AWS::Serverless::Function
@@ -1510,6 +1524,138 @@ Resources:
       ApiId: !Ref DevopsToolkitApi
       Stage: !Ref DevopsToolkitApi.Stage
       ApiMappingKey: "toolkit/v1"
+
+  ApiGwWafAssoc:
+    DependsOn: DevopsToolkitApiProdStage # An undocumented convention which can solve dependency issue; cf-lint though doesn't like this
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      WebACLArn: !GetAtt ApiWAF.Arn
+      ResourceArn: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${DevopsToolkitApi}/stages/${DevopsToolkitApi.Stage}'
+
+  WhitelistIPSet:
+    Type: AWS::WAFv2::IPSet
+    Properties:
+      Addresses: !Ref WhitelistIPs
+      Description: IP addresses to whitelist
+      IPAddressVersion: IPV4
+      Name: !Sub ${AWS::StackName}-WhitelistIPs
+      Scope: REGIONAL
+
+  # Enable for prod or public envts. Extra charges apply
+  ApiWAF:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      DefaultAction:
+        Allow: {}
+      Scope: REGIONAL
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        MetricName: AllowedRequests
+        SampledRequestsEnabled: true
+      Description: Devops Toolkit API Web application Firewall
+      Name: !Sub ${AWS::StackName}
+      Rules:
+        - Name: Custom-Geoblock
+          Priority: 1
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: Custom-Geoblock
+          Statement:
+            AndStatement:
+              Statements:
+                - NotStatement:
+                    Statement:
+                      GeoMatchStatement:
+                        CountryCodes: [NZ,AU] # Geo-blocking to sample countries (max 2)
+                - NotStatement:
+                    Statement:
+                      IPSetReferenceStatement:
+                        Arn: !GetAtt WhitelistIPSet.Arn
+          Action:
+            Block: {}
+        - Name: Custom-FloodRateBasedRule
+          Priority: 3
+          Statement:
+            RateBasedStatement:
+              Limit: 1000
+              AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-FloodRateBasedRule-WAFv2
+        - Name: AWSMR-CommonRules-WAFv2 #AWSMR = AWS Managed Rules
+          Priority: 5
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-CommonRules-WAFv2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+              ExcludedRules:
+                - Name: NoUserAgent_HEADER
+                - Name: SizeRestrictions_BODY
+        - Name: AWSMR-AdminProtection-WAFv2
+          Priority: 6
+          OverrideAction:
+            Count: {} #keep this on count
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-AdminProtection-WAFv2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAdminProtectionRuleSet
+        - Name: AWSMR-KnownBadInputs-WAFv2
+          Priority: 7
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-BadInputs-WAFv2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+        - Name: AWSMR-IpReputation-WAFv2
+          Priority: 8
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-IpReputation-WAFv2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+        - Name: AWSMR-SQLiRuleSet-WAFv2
+          Priority: 9
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSMR-SQLiRuleSet-WAFv2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+
+  WafLoggingConfig:
+    Type: AWS::WAFv2::LoggingConfiguration
+    Properties:
+      LogDestinationConfigs:
+        - !Sub 'arn:aws:s3:::aws-waf-logs-ap-southeast-2-${AWS::AccountId}-tbs-${Environment}'
+      ResourceArn: !GetAtt ApiWAF.Arn
 
 Outputs:
   ApiId:

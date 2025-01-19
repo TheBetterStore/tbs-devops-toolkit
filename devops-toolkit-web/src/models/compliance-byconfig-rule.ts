@@ -1,6 +1,7 @@
 export interface IComplianceByConfigRule {
   ConfigRuleName: string;
-  Compliance: ICompliance
+  Compliance: ICompliance;
+  PreviousNoncomplianceCount: number;
 }
 
 export interface ICompliance {
