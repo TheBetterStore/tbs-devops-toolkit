@@ -1,0 +1,54 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>Application Error Management</h1>
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-12">
+      <div class="card">
+<!--        <div class="card-header">-->
+<!--          <h4>Applications</h4>-->
+<!--        </div>-->
+        <div class="card-body">
+          <p-table
+            #dt1
+            [value]="applicationErrorConfigs"
+            dataKey="ApplicationId"
+            [rows]="pageSize"
+            [paginator]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+            selectionMode="single" [(selection)]="selectedApplication"
+            (onRowSelect)="onRowSelect($event)" (onRowUnselect)="onRowUnselect($event)"
+            [showCurrentPageReport]="true"
+            styleClass="p-datatable-striped"
+            [globalFilterFields]="['StackName']"
+            [loading]="isLoading">
+            <ng-template pTemplate="header">
+              <tr>
+                <th pSortableColumn="ApplicationId" style="width: 15%">Application <p-sortIcon/></th>
+                <th pSortableColumn="Region" style="width: 10%">Region <p-sortIcon/></th>
+                <th pSortableColumn="DlqName" style="width: 25%">DlqName <p-sortIcon/></th>
+                <th pSortableColumn="Description" style="width: 40%">Description <p-sortIcon/></th>
+                <th pSortableColumn="CurrentCount" style="width: 10%">Current Count <p-sortIcon/></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-app>
+              <tr>
+                <td><a href="/app-error-codes?applicationId={{app.ApplicationId}}" title="{{app.ApplicationId}}">{{ app.ApplicationId }}</a></td>
+                <td>{{ app.Region }} </td>
+                <td>{{ app.DlqName }} </td>
+                <td>{{ app.Description }} </td>
+                <td></td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
