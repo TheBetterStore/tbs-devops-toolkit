@@ -11,7 +11,7 @@ import {IAppErrorService} from '../../services/app-error-service.interface';
 
 console.log('INFO - lambda is cold-starting.');
 exports.handler = async (event: APIGatewayEvent) => {
-  Logger.info('Entered describe-compliancerules handler', event);
+  Logger.info('Entered retrieve-applicationerrorcodes handler', event);
 
   if (!event.requestContext || !event.requestContext.authorizer) {
     return HttpUtils.buildJsonResponse(400, {message: 'Missing authorizer'}, event?.headers?.origin + '');
@@ -36,11 +36,11 @@ exports.handler = async (event: APIGatewayEvent) => {
 
   try {
     const svc = container.get<IAppErrorService>(TYPES.IAppErrorService);
-    const appConfigs = await svc.retrieveApplicationErrorCodes(applicationId);
+    const errorCodes = await svc.retrieveApplicationErrorCodes(applicationId);
 
-    Logger.debug('Filtered rules:', appConfigs);
+    Logger.debug('Error codes:', errorCodes);
 
-    const response = HttpUtils.buildJsonResponse(200, appConfigs, event?.headers?.origin + '');
+    const response = HttpUtils.buildJsonResponse(200, errorCodes, event?.headers?.origin + '');
     Logger.info('Exiting handler');
     return response;
   } catch (e: any) {

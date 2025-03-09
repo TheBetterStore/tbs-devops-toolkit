@@ -44,11 +44,13 @@ export class AppErrorService implements IAppErrorService {
    * @return {Promise<QueryOutput>}
    */
   async retrieveApplicationErrorCodes(applicationId: string): Promise<QueryOutput> {
+    console.info(`Retrieving codes for ${applicationId}, against table ${this.appErrorCodeTableName}`);
     const params: DocumentClient.QueryInput = {
       TableName: this.appErrorCodeTableName,
       ExpressionAttributeValues: {':appId': applicationId},
       KeyConditionExpression: 'ApplicationId = :appId',
     };
+    console.info(params);
 
     const res = await this.ddbClient.query(params);
     return res;
