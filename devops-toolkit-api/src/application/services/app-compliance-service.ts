@@ -17,7 +17,7 @@ import {DocumentClient, ScanOutput} from 'aws-sdk/clients/dynamodb';
 export class AppComplianceService implements IAppComplianceService {
   private ddbClient: IDynamoDBClient;
   private ssmClient: ISSMClient;
-  private readonly configNonComplianceTableName: string;
+  // private readonly configNonComplianceTableName: string;
   private readonly configNonComplianceCountsTableName: string;
 
   /**
@@ -29,7 +29,7 @@ export class AppComplianceService implements IAppComplianceService {
       @inject(TYPES.ISsmClient) ssmClient: ISSMClient) {
     this.ddbClient = ddbClient;
     this.ssmClient = ssmClient;
-    this.configNonComplianceTableName = process.env.NONCOMPLIANCE_TABLE_NAME || '';
+    // this.configNonComplianceTableName = process.env.NONCOMPLIANCE_TABLE_NAME || '';
     this.configNonComplianceCountsTableName = process.env.NONCOMPLIANCE_COUNTS_TABLE_NAME || '';
   }
 
@@ -112,7 +112,6 @@ export class AppComplianceService implements IAppComplianceService {
    * @param {string} region
    */
   async resetNoncomplianceCounts(region: string): Promise<any> {
-
     const configClient = container.get<IConfigClient>(TYPES.IConfigClient);
 
     const q1: DescribeComplianceByConfigRuleCommandInput = {
