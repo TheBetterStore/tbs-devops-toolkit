@@ -3,12 +3,16 @@ import {IApplicationErrorConfig} from "../../../models/application-error-config.
 import {IApplicationErrorCode} from "../../../models/application-error-code.interface";
 import {ApplicationErrorService} from "../../services/application-error.service";
 import {ActivatedRoute, Router} from "@angular/router";
-import {ConfirmationService, MessageService} from "primeng/api";
+import {ConfirmationService, MessageService, SharedModule} from "primeng/api";
+import {TableModule} from "primeng/table";
 
 @Component({
   selector: 'app-application-error-codes',
   standalone: true,
-  imports: [],
+  imports: [
+    SharedModule,
+    TableModule
+  ],
   templateUrl: './application-error-codes.component.html',
   styleUrl: './application-error-codes.component.scss'
 })
@@ -18,7 +22,7 @@ export class ApplicationErrorCodesComponent {
   infoMsg: string = "";
 
   applicationErrorCodes: IApplicationErrorCode[] = [];
-  selectedApplication: IApplicationErrorConfig | null = null;
+  selectedErrorCode: IApplicationErrorCode | null = null;
 
   applicationId: string = '';
 
