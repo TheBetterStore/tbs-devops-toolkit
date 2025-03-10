@@ -5,13 +5,17 @@ import {ApplicationErrorService} from "../../services/application-error.service"
 import {ActivatedRoute, Router} from "@angular/router";
 import {ConfirmationService, MessageService, SharedModule} from "primeng/api";
 import {TableModule} from "primeng/table";
+import {FormsModule} from "@angular/forms";
+import {NgIf} from "@angular/common";
 
 @Component({
   selector: 'app-application-error-codes',
   standalone: true,
   imports: [
     SharedModule,
-    TableModule
+    TableModule,
+    FormsModule,
+    NgIf
   ],
   templateUrl: './application-error-codes.component.html',
   styleUrl: './application-error-codes.component.scss'
@@ -74,5 +78,17 @@ export class ApplicationErrorCodesComponent {
         () => {
         }
       );
+  }
+
+  onRowEditInit(app: IApplicationErrorCode) {
+    console.log(app);
+  }
+
+  onRowEditSave(app: IApplicationErrorCode) {
+    console.log(app);
+  }
+
+  onRowEditCancel(app: any, ri: any) {
+
   }
 }

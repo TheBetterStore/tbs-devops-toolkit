@@ -14,16 +14,14 @@
         </div>
         <div class="card-body">
           <p-table
-            #dt1
             [value]="applicationErrorCodes"
-            dataKey="ApplicationId"
+            dataKey="ErrorCode"
+            editMode="row"
             [rows]="pageSize"
             [paginator]="true"
             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
-            selectionMode="single" [(selection)]="selectedErrorCode"
             [showCurrentPageReport]="true"
             styleClass="p-datatable-striped"
-            [globalFilterFields]="['StackName']"
             [loading]="isLoading">
             <ng-template pTemplate="header">
               <tr>
@@ -33,13 +31,64 @@
                 <th style="width: 10%">Actions <p-sortIcon/></th>
               </tr>
             </ng-template>
-            <ng-template pTemplate="body" let-app>
-              <tr>
-                <td>{{ app.ErrorCode }}</td>
-                <td>{{ app.Description }} </td>
-                <td>{{ app.Remediation }} </td>
-                <td> </td>
-                <td></td>
+            <ng-template pTemplate="body" let-app let-editing let-ri="rowIndex">
+              <tr [pEditableRow]="app">
+                <td>
+                  {{ app.ErrorCode }}
+                </td>
+                <td>
+                  <p-cellEditor>
+                    <ng-template pTemplate="input">
+                      <input pInputText type="text" [(ngModel)]="app.Description"/>
+                    </ng-template>
+                    <ng-template pTemplate="output">
+                      {{ app.Description }}
+                    </ng-template>
+                  </p-cellEditor>
+                </td>
+                <td>
+                  <p-cellEditor>
+                    <ng-template pTemplate="input">
+                      <input pInputText type="text" [(ngModel)]="app.Remediation"/>
+                    </ng-template>
+                    <ng-template pTemplate="output">
+                      {{ app.Remediation }}
+                    </ng-template>
+                  </p-cellEditor>
+                </td>
+                <td>
+                  <div class="flex align-items-center justify-content-center gap-2">
+                    <button
+                      *ngIf="!editing"
+                      pButton
+                      pRipple
+                      type="button"
+                      pInitEditableRow
+                      icon="pi pi-pencil"
+                      (click)="onRowEditInit(app)"
+                      class="p-button-rounded p-button-text">
+                    </button>
+                    <button
+                      *ngIf="editing"
+                      pButton
+                      pRipple
+                      type="button"
+                      pSaveEditableRow
+                      icon="pi pi-check"
+                      (click)="onRowEditSave(app)"
+                      class="p-button-rounded p-button-text p-button-success mr-2">
+                    </button>
+                    <button
+                      *ngIf="editing"
+                      pButton pRipple
+                      type="button"
+                      pCancelEditableRow
+                      icon="pi pi-times"
+                      (click)="onRowEditCancel(app, ri)"
+                      class="p-button-rounded p-button-text p-button-danger">
+                    ></button>
+                  </div>
+                </td>
               </tr>
             </ng-template>
           </p-table>
