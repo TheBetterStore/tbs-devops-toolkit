@@ -13,11 +13,17 @@ import {MaintainAuthGuard} from "./guards/maintain-auth.guard";
 import {StackDriftComponent} from "./components/stack-drift/stack-drift.component";
 import {ComplianceComponent} from "./components/compliance/compliance.component";
 import {ComplianceDetailsComponent} from "./components/compliance-details/compliance-details.component";
+import {
+  ApplicationErrorConfigsComponent
+} from "./components/application-error-configs/application-error-configs.component";
+import {ApplicationErrorCodesComponent} from "./components/application-error-codes/application-error-codes.component";
 
 export const routes: Routes = [
   {path: 'about', component: AboutComponent, canActivate: [AuthGuard()]},
   {path: 'home', component: HomeComponent, canActivate: [AuthGuard()]},
   {path: '', redirectTo: 'home', pathMatch: 'full'},
+  {path: 'app-error-configs', component: ApplicationErrorConfigsComponent, canActivate: [ViewAuthGuard()]},
+  {path: 'app-error-codes', component: ApplicationErrorCodesComponent, canActivate: [ViewAuthGuard()]},
   {path: 'compliance', component: ComplianceComponent, canActivate: [ViewAuthGuard()]},
   {path: 'compliance/:ruleName', component: ComplianceDetailsComponent, canActivate: [ViewAuthGuard()]},
   {path: 'stacks', component: StacksComponent, canActivate: [ViewAuthGuard()]},

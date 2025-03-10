@@ -199,6 +199,90 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
+  ApplicationErrorServiceLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-SSMPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: SsmParametersPolicy
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                Resource: !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter${FilteredComplianceRulesParamName}"
+              - Sid: DynamoDbPolicy
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !GetAtt ApplicationErrorConfigTable.Arn
+                  - !GetAtt ApplicationErrorCodeTable.Arn
+
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ApplicationErrorConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "ApplicationId"
+          AttributeType: "S"
+        - AttributeName: "Region"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "ApplicationId"
+          KeyType: "HASH"
+        - AttributeName: "Region"
+          KeyType: "RANGE"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false # Set to true if protection is needed
+  #      SSESpecification: # Enable for production environments
+  #        SSEEnabled: true
+
+  ApplicationErrorCodeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "ApplicationId"
+          AttributeType: "S"
+        - AttributeName: "ErrorCode"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "ApplicationId"
+          KeyType: "HASH"
+        - AttributeName: "ErrorCode"
+          KeyType: "RANGE"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false # Set to true if protection is needed
+  #      SSESpecification: # Enable for production environments
+  #        SSEEnabled: true
+
   ConfigNonCompliantRuleCountsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -239,6 +323,86 @@ Resources:
 #      SSESpecification: # Enable for production environments
 #        SSEEnabled: true
 
+  RetrieveApplicationErrorConfigsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref RetrieveApplicationErrorConfigsFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt ApplicationErrorServiceLambdaExcecutionRole.Arn
+      Description: Retrieve Application Error Configs.
+      Environment:
+        Variables:
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          APPLICATION_ERROR_CONFIG_TABLE_NAME: !Ref ApplicationErrorConfigTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/retrieve-applicationerrorconfigs/index.ts
+
+  RetrieveApplicationErrorConfigsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-RetrieveApplicationErrorConfigsFunction"
+      RetentionInDays: 365
+
+  RetrieveApplicationErrorCodesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref RetrieveApplicationErrorCodesFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt ApplicationErrorServiceLambdaExcecutionRole.Arn
+      Description: Retrieve application error codes.
+      Environment:
+        Variables:
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          APPLICATION_ERROR_CODE_TABLE_NAME: !Ref ApplicationErrorCodeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/retrieve-applicationerrorcodes/index.ts
+
+  RetrieveApplicationErrorCodesFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-RetrieveApplicationErrorCodesFunction"
+      RetentionInDays: 365
+
   ResetNonComplianceRuleCountsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -278,7 +442,7 @@ Resources:
   ResetNonComplianceRuleCountsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", ResetNonComplianceRuleCountsFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-ResetNonComplianceRuleCountsFunction"
       RetentionInDays: 365
 
   DescribeComplianceRulesFunction:
@@ -321,7 +485,7 @@ Resources:
   DescribeComplianceRulesFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeComplianceRulesFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeComplianceRulesFunction"
       RetentionInDays: 365
 
   DescribeComplianceRuleDetailsFunction:
@@ -363,7 +527,7 @@ Resources:
   DescribeComplianceRuleDetailsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeComplianceRuleDetailsFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeComplianceRuleDetailsFunction"
       RetentionInDays: 365
 
   DescribeStacksFunction:
@@ -404,7 +568,7 @@ Resources:
   DescribeStacksFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeStacksFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeStacksFunction"
       RetentionInDays: 365
 
   DescribeChangesetFunction:
@@ -445,7 +609,7 @@ Resources:
   DescribeChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeChangesetFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeChangesetFunction"
       RetentionInDays: 365
 
   ExecuteChangesetFunction:
@@ -486,7 +650,7 @@ Resources:
   ExecuteChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", ExecuteChangesetFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-ExecuteChangesetFunction"
       RetentionInDays: 365
 
   DescribeParametersFunction:
@@ -527,7 +691,7 @@ Resources:
   DescribeParametersFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeParametersFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeParametersFunction"
       RetentionInDays: 365
 
   UpdateParameterFunction:
@@ -568,7 +732,7 @@ Resources:
   UpdateParameterFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", UpdateParameterFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpdateParameterFunction"
       RetentionInDays: 365
 
   CreateChangesetFunction:
@@ -609,7 +773,7 @@ Resources:
   CreateChangesetFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", CreateChangesetFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-CreateChangesetFunction"
       RetentionInDays: 365
 
   DetectStackDriftFunction:
@@ -650,7 +814,7 @@ Resources:
   DetectStackDriftFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DetectStackDriftFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DetectStackDriftFunction"
       RetentionInDays: 365
 
   DescribeStackResourceDriftsFunction:
@@ -691,7 +855,7 @@ Resources:
   DescribeStackResourceDriftsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", DescribeStackResourceDriftsFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-DescribeStackResourceDriftsFunction"
       RetentionInDays: 365
 
   WriteAuditFunction:
@@ -730,7 +894,7 @@ Resources:
   WriteAuditFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Join [ '', [ "/aws/lambda/", WriteAuditFunction ] ]
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-WriteAuditFunction"
       RetentionInDays: 365
 
   CWLogGroupApiGwAccessLogs:
@@ -738,6 +902,22 @@ Resources:
     Properties:
       LogGroupName: !Join ["", ["API-Gateway-Access-Logs_", !Sub "${AWS::StackName}"]]
       RetentionInDays: 365
+
+  RetrieveApplicationErrorConfigsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "RetrieveApplicationErrorConfigsFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+
+  RetrieveApplicationErrorCodesFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "RetrieveApplicationErrorCodesFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
 
   DescribeStacksFunctionApiGatewayInvoke:
     Type: "AWS::Lambda::Permission"
@@ -871,6 +1051,134 @@ Resources:
           title: !Sub "${AWS::StackName}-api"
           version: "2021-06-10T02:04:23Z"
         paths:
+          /app-error-configs:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RetrieveApplicationErrorConfigsFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /app-error-codes:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RetrieveApplicationErrorCodesFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
           /config-rules:
             get:
               security:
@@ -880,8 +1188,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -946,8 +1252,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1012,8 +1316,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1077,8 +1379,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1143,8 +1443,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1172,8 +1470,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1238,8 +1534,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1304,8 +1598,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1333,8 +1625,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1399,8 +1689,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:
@@ -1428,8 +1716,6 @@ Resources:
               responses:
                 "200":
                   description: "200 response"
-                  schema:
-                    $ref: "#/definitions/Empty"
                   headers:
                     Strict-Transport-Security:
                       schema:

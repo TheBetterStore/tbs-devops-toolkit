@@ -6,6 +6,7 @@ const TYPES = {
   UserTableName: Symbol('UserTableName'),
   IDynamoDBClient: Symbol('IDynamoDBClient'),
   IAppComplianceService: Symbol('IAppComplianceService'),
+  IAppErrorService: Symbol('IAppErrorService'),
 };
 
 export default TYPES;
