@@ -7,6 +7,8 @@ import {ConfirmationService, MessageService, SharedModule} from "primeng/api";
 import {TableModule} from "primeng/table";
 import {FormsModule} from "@angular/forms";
 import {NgIf} from "@angular/common";
+import {Button, ButtonDirective} from "primeng/button";
+import {ToolbarModule} from "primeng/toolbar";
 
 @Component({
   selector: 'app-application-error-codes',
@@ -15,7 +17,10 @@ import {NgIf} from "@angular/common";
     SharedModule,
     TableModule,
     FormsModule,
-    NgIf
+    NgIf,
+    ButtonDirective,
+    Button,
+    ToolbarModule
   ],
   templateUrl: './application-error-codes.component.html',
   styleUrl: './application-error-codes.component.scss'
@@ -26,7 +31,10 @@ export class ApplicationErrorCodesComponent {
   infoMsg: string = "";
 
   applicationErrorCodes: IApplicationErrorCode[] = [];
+  clonedApplicationCodes: { [s: string]: IApplicationErrorCode } = {};
+  applicationErrorCode!: IApplicationErrorCode;
   selectedErrorCode: IApplicationErrorCode | null = null;
+  selectedRecs: any;
 
   applicationId: string = '';
 
@@ -60,6 +68,9 @@ export class ApplicationErrorCodesComponent {
         p => {
           console.log(p);
           console.log(p.NextToken);
+          for(let i = 0; i < self.applicationErrorCodes.length; i++) {
+            self.applicationErrorCodes[i].Id = self.applicationErrorCodes[i].ErrorCode;
+          }
           self.applicationErrorCodes = p.Items;
           self.errorMsg = '';
           self.isLoading = false;
@@ -85,10 +96,23 @@ export class ApplicationErrorCodesComponent {
   }
 
   onRowEditSave(app: IApplicationErrorCode) {
+    app.Id = app.ErrorCode;
     console.log(app);
   }
 
-  onRowEditCancel(app: any, ri: any) {
-
+  onRowEditCancel(rec: IApplicationErrorCode, index: number) {
+    this.applicationErrorCodes[index] = this.clonedApplicationCodes[rec.ErrorCode as string];
   }
+
+  openNew() {
+    this.applicationErrorCode = {ErrorCode: '', Description: '', Remediation: ''};
+    this.applicationErrorCodes.push(this.applicationErrorCode);
+    console.log('New');
+  }
+
+  deleteSelectedRecs() {
+    console.log('Delete selected recs');
+  }
+
+
 }

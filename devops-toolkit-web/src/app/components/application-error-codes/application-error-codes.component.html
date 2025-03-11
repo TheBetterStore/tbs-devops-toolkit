@@ -14,8 +14,9 @@
         </div>
         <div class="card-body">
           <p-table
+            #dt
             [value]="applicationErrorCodes"
-            dataKey="ErrorCode"
+            dataKey="Id"
             editMode="row"
             [rows]="pageSize"
             [paginator]="true"
@@ -25,57 +26,72 @@
             [loading]="isLoading">
             <ng-template pTemplate="header">
               <tr>
+                <th style="width: 4rem">
+                  <p-tableHeaderCheckbox />
+                </th>
                 <th pSortableColumn="ErrorCode" style="width: 10%">ErrorCode <p-sortIcon/></th>
                 <th pSortableColumn="Description" style="width: 40%">Description <p-sortIcon/></th>
                 <th pSortableColumn="Remediation" style="width: 40%">Remediation <p-sortIcon/></th>
                 <th style="width: 10%">Actions <p-sortIcon/></th>
               </tr>
             </ng-template>
-            <ng-template pTemplate="body" let-app let-editing let-ri="rowIndex">
-              <tr [pEditableRow]="app">
+            <ng-template pTemplate="body" let-rec let-editing="editing" let-ri="rowIndex">
+              <tr [pEditableRow]="rec">
                 <td>
-                  {{ app.ErrorCode }}
+                  <p-tableCheckbox [value]="rec" />
                 </td>
                 <td>
                   <p-cellEditor>
                     <ng-template pTemplate="input">
-                      <input pInputText type="text" [(ngModel)]="app.Description"/>
+                      <input pInputText type="text" class="form-control" [(ngModel)]="rec.ErrorCode"/>
                     </ng-template>
                     <ng-template pTemplate="output">
-                      {{ app.Description }}
+                      {{ rec.ErrorCode }}
                     </ng-template>
                   </p-cellEditor>
                 </td>
                 <td>
                   <p-cellEditor>
                     <ng-template pTemplate="input">
-                      <input pInputText type="text" [(ngModel)]="app.Remediation"/>
+                      <textarea pInputText type="text" class="form-control" [(ngModel)]="rec.Description"></textarea>
                     </ng-template>
                     <ng-template pTemplate="output">
-                      {{ app.Remediation }}
+                      {{ rec.Description }}
+                    </ng-template>
+                  </p-cellEditor>
+                </td>
+                <td>
+                  <p-cellEditor>
+                    <ng-template pTemplate="input">
+                      <textarea pInputText type="text" class="form-control" [(ngModel)]="rec.Remediation"></textarea>
+                    </ng-template>
+                    <ng-template pTemplate="output">
+                      {{ rec.Remediation }}
                     </ng-template>
                   </p-cellEditor>
                 </td>
                 <td>
                   <div class="flex align-items-center justify-content-center gap-2">
+                    <!--<button pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" ></button>-->
+
                     <button
                       *ngIf="!editing"
-                      pButton
-                      pRipple
+                      pButton pRipple
                       type="button"
                       pInitEditableRow
                       icon="pi pi-pencil"
-                      (click)="onRowEditInit(app)"
+                      (click)="onRowEditInit(rec)"
                       class="p-button-rounded p-button-text">
                     </button>
+
                     <button
                       *ngIf="editing"
                       pButton
                       pRipple
                       type="button"
                       pSaveEditableRow
-                      icon="pi pi-check"
-                      (click)="onRowEditSave(app)"
+                      icon="pi pi-pencil"
+                      (click)="onRowEditSave(rec)"
                       class="p-button-rounded p-button-text p-button-success mr-2">
                     </button>
                     <button
@@ -84,14 +100,32 @@
                       type="button"
                       pCancelEditableRow
                       icon="pi pi-times"
-                      (click)="onRowEditCancel(app, ri)"
+                      (click)="onRowEditCancel(rec, ri)"
                       class="p-button-rounded p-button-text p-button-danger">
-                    ></button>
+                    </button>
+
                   </div>
                 </td>
               </tr>
             </ng-template>
           </p-table>
+          <p-toolbar styleClass="mb-4 gap-2">
+            <ng-template pTemplate="left">
+              <p-button
+                severity="success"
+                label="New"
+                icon="pi pi-plus"
+                class="btn mr-2"
+                (onClick)="openNew()" />
+              <p-button
+                severity="danger"
+                label="Delete"
+                icon="pi pi-trash"
+                class="btn"
+                (onClick)="deleteSelectedRecs()"
+                [disabled]="!selectedRecs || !selectedRecs.length" />
+            </ng-template>
+          </p-toolbar>
         </div>
       </div>
     </div>
