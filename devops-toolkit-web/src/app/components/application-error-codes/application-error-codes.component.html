@@ -17,7 +17,7 @@
             #dt
             [value]="applicationErrorCodes"
             dataKey="Id"
-            editMode="row"
+            [rowHover]="true"
             [rows]="pageSize"
             [paginator]="true"
             currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
@@ -35,76 +35,40 @@
                 <th style="width: 10%">Actions <p-sortIcon/></th>
               </tr>
             </ng-template>
-            <ng-template pTemplate="body" let-rec let-editing="editing" let-ri="rowIndex">
+            <ng-template pTemplate="body" let-rec>
               <tr [pEditableRow]="rec">
                 <td>
                   <p-tableCheckbox [value]="rec" />
                 </td>
                 <td>
-                  <p-cellEditor>
-                    <ng-template pTemplate="input">
-                      <input pInputText type="text" class="form-control" [(ngModel)]="rec.ErrorCode"/>
-                    </ng-template>
-                    <ng-template pTemplate="output">
-                      {{ rec.ErrorCode }}
-                    </ng-template>
-                  </p-cellEditor>
+                  {{ rec.ErrorCode }}
                 </td>
                 <td>
-                  <p-cellEditor>
-                    <ng-template pTemplate="input">
-                      <textarea pInputText type="text" class="form-control" [(ngModel)]="rec.Description"></textarea>
-                    </ng-template>
-                    <ng-template pTemplate="output">
-                      {{ rec.Description }}
-                    </ng-template>
-                  </p-cellEditor>
+                  {{ rec.Description }}
                 </td>
                 <td>
-                  <p-cellEditor>
-                    <ng-template pTemplate="input">
-                      <textarea pInputText type="text" class="form-control" [(ngModel)]="rec.Remediation"></textarea>
-                    </ng-template>
-                    <ng-template pTemplate="output">
-                      {{ rec.Remediation }}
-                    </ng-template>
-                  </p-cellEditor>
+                  {{ rec.Remediation }}
                 </td>
                 <td>
-                  <div class="flex align-items-center justify-content-center gap-2">
-                    <!--<button pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" ></button>-->
 
-                    <button
-                      *ngIf="!editing"
-                      pButton pRipple
-                      type="button"
-                      pInitEditableRow
+                    <p-button
                       icon="pi pi-pencil"
-                      (click)="onRowEditInit(rec)"
-                      class="p-button-rounded p-button-text">
-                    </button>
-
-                    <button
-                      *ngIf="editing"
-                      pButton
-                      pRipple
-                      type="button"
-                      pSaveEditableRow
-                      icon="pi pi-pencil"
-                      (click)="onRowEditSave(rec)"
-                      class="p-button-rounded p-button-text p-button-success mr-2">
-                    </button>
-                    <button
-                      *ngIf="editing"
+                      (onClick)="editRec(rec)"
+                      [rounded]="true"
+                      [outlined]="true"
+                      severity="success"
+                      class="mr-2">
+                    </p-button>
+                    &nbsp;
+                    <p-button
                       pButton pRipple
-                      type="button"
-                      pCancelEditableRow
-                      icon="pi pi-times"
-                      (click)="onRowEditCancel(rec, ri)"
-                      class="p-button-rounded p-button-text p-button-danger">
-                    </button>
+                      severity="danger"
+                      icon="pi pi-trash"
+                      severity="danger"
+                      [rounded]="true"
+                      [outlined]="true"
+                      (onClick)="deleteRec(rec)"/>
 
-                  </div>
                 </td>
               </tr>
             </ng-template>
@@ -130,4 +94,68 @@
       </div>
     </div>
   </div>
+
+  <p-dialog
+    [(visible)]="showDialog"
+    [style]="{ width: '450px' }"
+    header="Product Details"
+    [modal]="true"
+    styleClass="p-fluid">
+    <ng-template pTemplate="content">
+      <div class="field">
+        <label for="name">ErrorCode</label>
+        <input class="form-control"
+          type="text"
+          pInputText
+          id="name"
+          [(ngModel)]="applicationErrorCode.ErrorCode"
+          required
+          autofocus />
+        <small class="p-error" *ngIf="submitted && !applicationErrorCode.ErrorCode">
+          Name is required.
+        </small>
+      </div>
+      <div class="field top-buffer">
+        <label for="description">Description</label>
+        <textarea class="form-control"
+          id="description"
+          pInputTextarea
+          [(ngModel)]="applicationErrorCode.Description"
+          required
+          rows="3"
+          cols="20">
+        </textarea>
+      </div>
+      <div class="field top-buffer">
+        <label for="remediation">Remediation</label>
+        <textarea  class="form-control"
+          id="remediation"
+          pInputTextarea
+          [(ngModel)]="applicationErrorCode.Remediation"
+          required
+          rows="3"
+          cols="20">
+        </textarea>
+      </div>
+
+    </ng-template>
+
+    <ng-template pTemplate="footer">
+      <p-button
+        label="Cancel"
+        icon="pi pi-times"
+        [text]="true"
+        (onClick)="hideDialog()" />
+      <p-button
+        label="Save"
+        icon="pi pi-check"
+        [text]="true"
+        (onClick)="saveRec()" />
+    </ng-template>
+  </p-dialog>
+
+  <p-confirmDialog [style]="{ width: '450px' }" />
 </div>
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>
