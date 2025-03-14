@@ -12,6 +12,8 @@ import {ToolbarModule} from "primeng/toolbar";
 import {ConfirmDialogModule} from "primeng/confirmdialog";
 import {InputNumberModule} from "primeng/inputnumber";
 import {DialogModule} from "primeng/dialog";
+import {ProgressSpinnerModule} from "primeng/progressspinner";
+import {ToastModule} from "primeng/toast";
 
 @Component({
   selector: 'app-application-error-codes',
@@ -26,7 +28,9 @@ import {DialogModule} from "primeng/dialog";
     ToolbarModule,
     ConfirmDialogModule,
     InputNumberModule,
-    DialogModule
+    DialogModule,
+    ProgressSpinnerModule,
+    ToastModule
   ],
   templateUrl: './application-error-codes.component.html',
   styleUrl: './application-error-codes.component.scss'
@@ -53,10 +57,11 @@ export class ApplicationErrorCodesComponent {
 
   constructor(private applicationErrorService: ApplicationErrorService, private route: ActivatedRoute,
               private messageService: MessageService, private confirmationService: ConfirmationService,
-              private router: Router) {}
+              private router: Router) {
+
+  }
 
   ngOnInit(): void {
-
     console.log(this.route.snapshot.paramMap);
 
     this.sub = this.route.queryParamMap
@@ -66,8 +71,6 @@ export class ApplicationErrorCodesComponent {
 
         this.loadApplicationErrorCodes(this.applicationId);
       });
-
-
   }
 
   loadApplicationErrorCodes(applicationId: string) {
@@ -154,22 +157,48 @@ export class ApplicationErrorCodesComponent {
   }
 
   saveRec() {
+    const self = this;
     this.submitted = true;
 
 
     if (this.applicationErrorCode.ErrorCode?.trim()) {
       if (this.applicationErrorCode.Id) {
         this.applicationErrorCodes[this.findIndexById(this.applicationErrorCode.Id)] = this.applicationErrorCode;
-        this.messageService.add({ severity: 'success', summary: 'Successful', detail: 'Product Updated', life: 3000 });
       } else {
         this.applicationErrorCode.Id = this.createId(this.applicationErrorCode);
         this.applicationErrorCodes.push(this.applicationErrorCode);
-        this.messageService.add({ severity: 'success', summary: 'Successful', detail: 'Product Created', life: 3000 });
       }
-      this.saveAppErrorCode(this.applicationErrorCode);
-      this.applicationErrorCodes = [...this.applicationErrorCodes];
-      this.showDialog = false;
-      this.applicationErrorCode ={ ApplicationId: this.applicationId,  ErrorCode: '', Description: '', Remediation: ''};
+
+      this.applicationErrorService.saveAppErrorCode(this.applicationErrorCode)
+        .subscribe(
+          p => {
+            self.messageService.add({
+              severity: 'info',
+              summary: 'Success',
+              detail: "Code saved",
+              life: 5000
+            });
+            self.errorMsg = '';
+            self.isLoading = false;
+          },
+          e => {
+            console.log(e);
+            self.messageService.add({
+              severity: 'error',
+              summary: 'Update failed',
+              detail: e.message,
+              life: 5000
+            });
+            self.errorMsg = e.message;
+            self.isLoading = false;
+          },
+          () => {
+            this.applicationErrorCodes = [...this.applicationErrorCodes];
+            this.showDialog = false;
+            this.applicationErrorCode ={ ApplicationId: this.applicationId,  ErrorCode: '', Description: '', Remediation: ''};
+          }
+        );
+
     }
   }
 

@@ -7,7 +7,6 @@ import {Logger} from '../../../infrastructure/logger';
 import {HttpUtils} from '../../../infrastructure/http-utils';
 import {AuthUtils} from '../../../infrastructure/auth-utils';
 import {InvalidDataError} from '../../../domain/models/invalid-data-error';
-import {AuditClient} from '../../../infrastructure/adapters/audit-client';
 import {IAppErrorService} from '../../services/app-error-service.interface';
 
 console.log('INFO - lambda is cold-starting.');
@@ -35,7 +34,7 @@ exports.handler = async (event: APIGatewayEvent) => {
   Logger.debug('Body:', body);
 
   // Executing...
-  await AuditClient.writeAudit('UpsertApplicationErrorCode', event);
+  // await AuditClient.writeAudit('UpsertApplicationErrorCode', event);
 
   const svc = container.get<IAppErrorService>(TYPES.IAppErrorService);
   const updateResult = await svc.saveApplicationErrorCode(body);
@@ -44,4 +43,4 @@ exports.handler = async (event: APIGatewayEvent) => {
   const response = HttpUtils.buildJsonResponse(200, {'status': 'updated'}, event?.headers?.origin + '');
   Logger.info('Exiting handler');
   return response;
-}
+};

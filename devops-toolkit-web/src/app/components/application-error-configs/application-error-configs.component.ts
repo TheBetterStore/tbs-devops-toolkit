@@ -6,6 +6,9 @@ import {ConfirmationService, MessageService, SharedModule} from "primeng/api";
 import {ButtonModule} from "primeng/button";
 import {NgIf} from "@angular/common";
 import {TableModule} from "primeng/table";
+import {ConfirmDialogModule} from "primeng/confirmdialog";
+import {ProgressSpinnerModule} from "primeng/progressspinner";
+import {ToastModule} from "primeng/toast";
 
 @Component({
   selector: 'app-application-error-configs',
@@ -14,7 +17,10 @@ import {TableModule} from "primeng/table";
     ButtonModule,
     NgIf,
     SharedModule,
-    TableModule
+    TableModule,
+    ConfirmDialogModule,
+    ProgressSpinnerModule,
+    ToastModule
   ],
   templateUrl: './application-error-configs.component.html',
   styleUrl: './application-error-configs.component.scss'

@@ -400,7 +400,7 @@ Resources:
   UpsertApplicationErrorConfigFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpsertApplicationErrorConfigsFunction"
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpsertApplicationErrorConfigFunction"
       RetentionInDays: 365
 
   RetrieveApplicationErrorCodesFunction:

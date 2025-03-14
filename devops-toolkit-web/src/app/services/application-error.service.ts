@@ -46,16 +46,11 @@ export class ApplicationErrorService extends BaseService {
 
     let url = `${environment.apiBaseUrl}/v1/app-error-codes`;
 
-    const body = {
-      region: region,
-      appErrorCode: a
-    };
-    console.log('Calling PUT on url:' + url + " with body: ", body);
+    console.log('Calling PUT on url:' + url + " with body: ", a);
     const result$ = this.http
-      .put(url, body,{headers: {
+      .put(url, a,{headers: {
           skip: 'true'
         }})
-      .pipe(map(mapCodes))
       .pipe(catchError(this.handleError));
     return result$;
   }
