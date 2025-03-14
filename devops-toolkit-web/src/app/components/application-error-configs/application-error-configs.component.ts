@@ -46,7 +46,6 @@ export class ApplicationErrorConfigsComponent {
     .subscribe(
       p => {
         console.log(p);
-        console.log(p.NextToken);
         self.applicationErrorConfigs = p.Items;
         self.errorMsg = '';
         self.isLoading = false;

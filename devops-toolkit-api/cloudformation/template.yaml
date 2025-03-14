@@ -363,6 +363,46 @@ Resources:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-RetrieveApplicationErrorConfigsFunction"
       RetentionInDays: 365
 
+  UpsertApplicationErrorConfigFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref UpsertApplicationErrorConfigFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt ApplicationErrorServiceLambdaExcecutionRole.Arn
+      Description: Retrieve Application Error Configs.
+      Environment:
+        Variables:
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          APPLICATION_ERROR_CONFIG_TABLE_NAME: !Ref ApplicationErrorConfigTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/upsert-applicationerrorconfig/index.ts
+
+  UpsertApplicationErrorConfigFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpsertApplicationErrorConfigsFunction"
+      RetentionInDays: 365
+
   RetrieveApplicationErrorCodesFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -401,6 +441,46 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-RetrieveApplicationErrorCodesFunction"
+      RetentionInDays: 365
+
+  UpsertApplicationErrorCodeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref UpsertApplicationErrorCodeFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt ApplicationErrorServiceLambdaExcecutionRole.Arn
+      Description: Retrieve application error codes.
+      Environment:
+        Variables:
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          APPLICATION_ERROR_CODE_TABLE_NAME: !Ref ApplicationErrorCodeTable
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/upsert-applicationerrorcode/index.ts
+
+  UpsertApplicationErrorCodeFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpsertApplicationErrorCodeFunction"
       RetentionInDays: 365
 
   ResetNonComplianceRuleCountsFunction:
@@ -911,11 +991,27 @@ Resources:
       Principal: "apigateway.amazonaws.com"
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
 
+  UpsertApplicationErrorConfigFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "UpsertApplicationErrorConfigFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+
   RetrieveApplicationErrorCodesFunctionApiGatewayInvoke:
     Type: "AWS::Lambda::Permission"
     Properties:
       Action: "lambda:InvokeFunction"
       FunctionName: !Ref "RetrieveApplicationErrorCodesFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+
+  UpsertApplicationErrorCodeFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "UpsertApplicationErrorCodeFunction.Alias"
       Principal: "apigateway.amazonaws.com"
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
 
@@ -1079,6 +1175,33 @@ Resources:
                 passthroughBehavior: "when_no_match"
                 contentHandling: "CONVERT_TO_TEXT"
                 type: "aws_proxy"
+            put:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpsertApplicationErrorConfigFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
             options:
               consumes:
                 - "application/json"
@@ -1135,6 +1258,33 @@ Resources:
               x-amazon-apigateway-integration:
                 httpMethod: "POST"
                 uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RetrieveApplicationErrorCodesFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            put:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpsertApplicationErrorCodeFunction.Arn}:prod/invocations"
                 responses:
                   default:
                     statusCode: "200"
