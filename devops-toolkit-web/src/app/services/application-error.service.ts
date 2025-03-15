@@ -5,6 +5,7 @@ import {BaseService} from "./base.service";
 import {environment} from "../../environments/environment";
 import {catchError, map, Observable} from "rxjs";
 import {IApplicationErrorCode} from "../../models/application-error-code.interface";
+import {IApplicationErrorConfig} from "../../models/application-error-config.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -15,7 +16,7 @@ export class ApplicationErrorService extends BaseService {
     super();
   }
 
-  getAppErrorConfigs() {
+  getAppErrorConfigs(): Observable<any> {
     let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
 
     console.log('Calling GET on url:' + url);
@@ -41,6 +42,21 @@ export class ApplicationErrorService extends BaseService {
     return codes$;
   }
 
+  saveAppErrorConfig(a: IApplicationErrorConfig) {
+    const region = this.regionService.getRegion();
+    a.Region = region;
+
+    let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
+
+    console.log('Calling PUT on url:' + url + " with body: ", a);
+    const result$ = this.http
+      .put(url, a, {headers: {
+          skip: 'true'
+        }})
+      .pipe(catchError(this.handleError));
+    return result$;
+  }
+
   saveAppErrorCode(a: IApplicationErrorCode) {
     const region = this.regionService.getRegion();
 
@@ -57,12 +73,18 @@ export class ApplicationErrorService extends BaseService {
 }
 
 function mapConfigs(r: any) {
+  let x: IApplicationErrorConfig[] =r.Items;
+  let y = x.map(mapConfig);
+  return y;
+}
+
+function mapConfig(r: IApplicationErrorConfig): IApplicationErrorConfig {
+  r.Id = r.ApplicationId;
   return r;
 }
 
 function mapCodes(r: any): IApplicationErrorCode[] {
   let x: IApplicationErrorCode[] =r.Items;
-  //r.map(mapConfig)
   let y = x.map(mapCode);
   console.log(y);
   return y;

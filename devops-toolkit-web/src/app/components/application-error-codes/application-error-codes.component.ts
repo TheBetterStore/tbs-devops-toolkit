@@ -43,7 +43,6 @@ export class ApplicationErrorCodesComponent {
   showDialog: boolean = false;
 
   applicationErrorCodes: IApplicationErrorCode[] = [];
-  clonedApplicationCodes: { [s: string]: IApplicationErrorCode } = {};
   applicationErrorCode!: IApplicationErrorCode;
   selectedErrorCodes!: IApplicationErrorCode[] | null;
   selectedRecs: any;
@@ -105,16 +104,6 @@ export class ApplicationErrorCodesComponent {
     this.showDialog = true;
   }
 
-  onRowEditSave(app: IApplicationErrorCode) {
-    app.Id = app.ErrorCode;
-    console.log(app);
-  }
-
-  onRowEditCancel(rec: IApplicationErrorCode, index: number) {
-    console.log('Cancelled')
-    //this.applicationErrorCodes[index] = this.clonedApplicationCodes[rec.Id as string];
-  }
-
   openNew() {
     this.applicationErrorCode = { ApplicationId: this.applicationId,  ErrorCode: '', Description: '', Remediation: ''};
     this.submitted = false;
@@ -173,7 +162,7 @@ export class ApplicationErrorCodesComponent {
         .subscribe(
           p => {
             self.messageService.add({
-              severity: 'info',
+              severity: 'success',
               summary: 'Success',
               detail: "Code saved",
               life: 5000
@@ -215,38 +204,5 @@ export class ApplicationErrorCodesComponent {
 
   createId(c: IApplicationErrorCode): string {
     return `${c.ApplicationId}|${c.ErrorCode}`;
-  }
-
-  saveAppErrorCode(appErrorCode: IApplicationErrorCode) {
-    const self = this;
-    self.isLoading = true;
-    this.applicationErrorService.saveAppErrorCode(appErrorCode)
-      .subscribe(
-        p => {
-          self.messageService.add({
-            severity: 'info',
-            summary: 'Success',
-            detail: "Code saved",
-            life: 5000
-          });
-          self.errorMsg = '';
-          self.isLoading = false;
-        },
-        e => {
-          console.log(e);
-          self.messageService.add({
-            severity: 'error',
-            summary: 'Update failed',
-            detail: e.message,
-            life: 5000
-          });
-          self.errorMsg = e.message;
-          self.isLoading = false;
-        },
-        () => {
-
-        }
-      );
-
   }
 }
