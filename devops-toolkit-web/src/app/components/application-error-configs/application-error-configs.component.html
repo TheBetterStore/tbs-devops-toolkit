@@ -39,7 +39,7 @@
               <tr [pEditableRow]="rec">
                 <td><a href="/app-error-codes?applicationId={{rec.ApplicationId}}" title="{{rec.ApplicationId}}">{{ rec.ApplicationId }}</a></td>
                 <td>{{ rec.Description }} </td>
-                <td><a href="#" (click)="viewImage(rec.ImageKey)">{{ rec.ImageKey }}</a> </td>
+                <td><span class="mylink" (click)="viewImage(rec.ImageKey)">View Image</span> </td>
                 <td>{{ rec.DlqName }} </td>
                 <td>{{ rec.DlqErrorCount}}</td>
                 <td>
@@ -159,6 +159,18 @@
         icon="pi pi-check"
         [text]="true"
         (onClick)="saveRec()" />
+    </ng-template>
+  </p-dialog>
+
+
+  <p-dialog
+    [(visible)]="showImageDialog"
+    [style]="{ width: '1024px' }"
+    header="Image"
+    [modal]="true"
+    styleClass="p-fluid">
+    <ng-template pTemplate="content">
+      <img src="{{imageUrl}}"/>
     </ng-template>
   </p-dialog>
 </div>

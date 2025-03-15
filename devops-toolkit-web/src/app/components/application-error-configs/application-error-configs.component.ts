@@ -51,6 +51,8 @@ export class ApplicationErrorConfigsComponent {
   sub: any;
   pageSize = 10;
 
+  imageUrl: string = '';
+
   constructor(private applicationErrorService: ApplicationErrorService, private route: ActivatedRoute,
               private messageService: MessageService, private confirmationService: ConfirmationService,
               private router: Router, private http: HttpClient) {}
@@ -210,6 +212,24 @@ export class ApplicationErrorConfigsComponent {
   }
 
   viewImage(imageKey: string) {
+    const self = this;
+    const config = self.applicationErrorConfig;
     console.log(imageKey);
+
+    this.applicationErrorService.getDocsPresignedUrl(imageKey || '', 'GET')
+      .subscribe(
+        q => {
+          console.log(q);
+          self.imageUrl = q.s3PresignedUrl;
+          console.log(self.imageUrl);
+          self.errorMsg = '';
+          self.showImageDialog = true;
+          self.isLoading = false;
+        },
+        e=> {
+          console.log(e);
+        })
   }
+
+  protected readonly event = event;
 }
