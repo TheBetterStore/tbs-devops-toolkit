@@ -61,6 +61,7 @@
                     [rounded]="true"
                     [outlined]="true"
                     (onClick)="deleteRec(rec)"/>
+
                 </td>
               </tr>
             </ng-template>
@@ -80,6 +81,13 @@
                 class="btn"
                 (onClick)="deleteSelectedRecs()"
                 [disabled]="!selectedRecs || !selectedRecs.length" />
+              <!--
+              <p-fileupload mode="basic" name="demo[]" chooseIcon="pi pi-upload" url="https://www.primefaces.org/cdn/api/upload.php"
+                            accept="image/*" maxFileSize="1000000"
+                            (onUpload)="onUpload($event)" [auto]="true" chooseLabel="Browse" />-->
+
+              <p-toast />
+
             </ng-template>
           </p-toolbar>
 
@@ -129,6 +137,10 @@
                    rows="3"
                    cols="20">
         </textarea>
+      </div>
+      <div>
+        <label for="image">Image</label>
+        <input type="file" id="image" class="file-upload" (change)="uploadFile($event)">
       </div>
 
     </ng-template>

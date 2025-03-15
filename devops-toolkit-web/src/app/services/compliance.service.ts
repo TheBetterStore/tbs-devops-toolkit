@@ -20,9 +20,7 @@ export class ComplianceService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const rules$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapRules))
       .pipe(catchError(this.handleError));
     return rules$;
@@ -34,9 +32,7 @@ export class ComplianceService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const results$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapRules))
       .pipe(catchError(this.handleError));
     return results$;
@@ -49,7 +45,6 @@ export class ComplianceService extends BaseService {
     console.log('Calling POST on url:' + url);
     const res$ = this.http
       .post(url, {headers: {
-          skip: 'true'
         }})
       .pipe(catchError(this.handleError));
     return res$;

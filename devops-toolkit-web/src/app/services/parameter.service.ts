@@ -45,9 +45,7 @@ export class ParameterService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const result$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapParameters))
       .pipe(catchError(this.handleError));
     return result$;
@@ -65,9 +63,7 @@ export class ParameterService extends BaseService {
     };
     console.log('Calling PUT on url:' + url + " with body: ", body);
     const result$ = this.http
-      .put(url, body,{headers: {
-          skip: 'true'
-        }})
+      .put(url, body)
       .pipe(map(mapParameters))
       .pipe(catchError(this.handleError));
     return result$;

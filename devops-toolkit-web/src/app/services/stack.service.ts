@@ -29,9 +29,7 @@ export class StackService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const stacks$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapStacks))
       .pipe(catchError(this.handleError));
     return stacks$;
@@ -49,9 +47,7 @@ export class StackService extends BaseService {
     console.log('Calling POST on url:' + url);
     console.log('Using body', body)
     const stacks$ = this.http
-      .post(url, body, {headers: {
-          skip: 'true'
-        }})
+      .post(url, body)
       .pipe(map(mapStacks))
       .pipe(catchError(this.handleError));
     return stacks$;
@@ -66,9 +62,7 @@ export class StackService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const stacks$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapStacks))
       .pipe(catchError(this.handleError));
     return stacks$;
@@ -87,9 +81,7 @@ export class StackService extends BaseService {
     }
     console.log('Calling POST on url:' + url);
     const stacks$ = this.http
-      .post(url, body, {headers: {
-          skip: 'true'
-        }})
+      .post(url, body)
       .pipe(map(mapStacks))
       .pipe(catchError(this.handleError));
     return stacks$;
@@ -106,9 +98,7 @@ export class StackService extends BaseService {
     }
     console.log('Calling POST on url:' + url);
     const stacks$ = this.http
-      .post(url, body, {headers: {
-          skip: 'true'
-        }})
+      .post(url, body)
       .pipe(catchError(this.handleError));
     return stacks$;
   }
@@ -120,9 +110,7 @@ export class StackService extends BaseService {
 
     console.log('Calling POST on url:' + url);
     const stacks$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(catchError(this.handleError));
     return stacks$;
   }

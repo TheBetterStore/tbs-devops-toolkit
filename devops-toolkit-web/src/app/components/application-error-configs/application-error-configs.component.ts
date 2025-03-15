@@ -13,6 +13,7 @@ import {FormsModule} from "@angular/forms";
 import {IApplicationErrorCode} from "../../../models/application-error-code.interface";
 import {IApplicationErrorConfig} from "../../../models/application-error-config.interface";
 import {ToolbarModule} from "primeng/toolbar";
+import {HttpClient} from "@angular/common/http";
 
 @Component({
   selector: 'app-application-error-configs',
@@ -51,7 +52,7 @@ export class ApplicationErrorConfigsComponent {
 
   constructor(private applicationErrorService: ApplicationErrorService, private route: ActivatedRoute,
               private messageService: MessageService, private confirmationService: ConfirmationService,
-              private router: Router) {}
+              private router: Router, private http: HttpClient) {}
 
   ngOnInit(): void {
     this.loadApplicationErrorConfigs();
@@ -180,6 +181,50 @@ export class ApplicationErrorConfigsComponent {
     const index = this.applicationErrorConfigs.map(e => e.ApplicationId).indexOf(id);
     console.log('index:', index);
     return index;
+  }
+
+  uploadFile(event: any) {
+    console.log(event);
+    const file: File = event.target.files[0];
+    console.log(file);
+    if(file) {
+      console.log(file.name);
+      this.getDocsPresignedUrl(file);
+    }
+  }
+
+  getDocsPresignedUrl(file: File) {
+    const self = this;
+    self.isLoading = true;
+    this.applicationErrorService.getDocsPresignedUrl(file.name)
+      .subscribe(
+        p => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const upload = self.http.put(p.s3PresignedUrl, file, {headers:  {'skip': 'true'}})
+            .subscribe(
+              q => {
+                console.log(q);
+                self.errorMsg = '';
+                self.isLoading = false;
+              }
+            )
+
+        },
+        e => {
+          console.log(e);
+          self.messageService.add({
+            severity: 'error',
+            summary: 'Status retrieval failed',
+            detail: e.message,
+            life: 5000
+          });
+          self.errorMsg = e.message;
+          self.isLoading = false;
+        },
+        () => {
+        }
+      );
   }
 
 }

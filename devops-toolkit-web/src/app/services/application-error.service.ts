@@ -21,9 +21,7 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const rules$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapConfigs))
       .pipe(catchError(this.handleError));
     return rules$;
@@ -34,9 +32,7 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const codes$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapCodes))
       .pipe(catchError(this.handleError));
     return codes$;
@@ -50,9 +46,7 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling PUT on url:' + url + " with body: ", a);
     const result$ = this.http
-      .put(url, a, {headers: {
-          skip: 'true'
-        }})
+      .put(url, a)
       .pipe(catchError(this.handleError));
     return result$;
   }
@@ -64,11 +58,19 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling PUT on url:' + url + " with body: ", a);
     const result$ = this.http
-      .put(url, a,{headers: {
-          skip: 'true'
-        }})
+      .put(url, a)
       .pipe(catchError(this.handleError));
     return result$;
+  }
+
+  getDocsPresignedUrl(filename: string): Observable<any> {
+    let url = `${environment.apiBaseUrl}/v1/docs/uploadsignedurl?filename=${filename}`;
+
+    console.log('Calling GET on url:' + url);
+    const codes$ = this.http
+      .get(url)
+      .pipe(catchError(this.handleError));
+    return codes$
   }
 }
 
