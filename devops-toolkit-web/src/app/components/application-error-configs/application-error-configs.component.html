@@ -28,9 +28,9 @@
             <ng-template pTemplate="header">
               <tr>
                 <th pSortableColumn="ApplicationId" style="width: 15%">Application <p-sortIcon/></th>
-                <th pSortableColumn="Region" style="width: 10%">Region <p-sortIcon/></th>
-                <th pSortableColumn="DlqName" style="width: 25%">DlqName <p-sortIcon/></th>
                 <th pSortableColumn="Description" style="width: 30%">Description <p-sortIcon/></th>
+                <th pSortableColumn="ImageKey" style="width: 10%">Image <p-sortIcon/></th>
+                <th pSortableColumn="DlqName" style="width: 25%">DlqName <p-sortIcon/></th>
                 <th pSortableColumn="CurrentCount" style="width: 10%">Current Count <p-sortIcon/></th>
                 <th style="width: 10%">Actions <p-sortIcon/></th>
               </tr>
@@ -38,9 +38,9 @@
             <ng-template pTemplate="body" let-rec>
               <tr [pEditableRow]="rec">
                 <td><a href="/app-error-codes?applicationId={{rec.ApplicationId}}" title="{{rec.ApplicationId}}">{{ rec.ApplicationId }}</a></td>
-                <td>{{ rec.Region }} </td>
-                <td>{{ rec.DlqName }} </td>
                 <td>{{ rec.Description }} </td>
+                <td><a href="#" (click)="viewImage(rec.ImageKey)">{{ rec.ImageKey }}</a> </td>
+                <td>{{ rec.DlqName }} </td>
                 <td>{{ rec.DlqErrorCount}}</td>
                 <td>
 
@@ -81,11 +81,6 @@
                 class="btn"
                 (onClick)="deleteSelectedRecs()"
                 [disabled]="!selectedRecs || !selectedRecs.length" />
-              <!--
-              <p-fileupload mode="basic" name="demo[]" chooseIcon="pi pi-upload" url="https://www.primefaces.org/cdn/api/upload.php"
-                            accept="image/*" maxFileSize="1000000"
-                            (onUpload)="onUpload($event)" [auto]="true" chooseLabel="Browse" />-->
-
               <p-toast />
 
             </ng-template>
@@ -138,9 +133,17 @@
                    cols="20">
         </textarea>
       </div>
+      <div class="field top-buffer">
+        <label for="imageKey">Image</label>
+        <input  class="form-control"
+                   id="imageKey"
+                   pInputTextarea
+                   [(ngModel)]="applicationErrorConfig.ImageKey"
+                   readonly/>
+      </div>
       <div>
-        <label for="image">Image</label>
-        <input type="file" id="image" class="file-upload" (change)="uploadFile($event)">
+        <label for="image">Update image?</label>
+        <input type="file" id="image" class="file-upload" (change)="selectFileToUpload($event)">
       </div>
 
     </ng-template>

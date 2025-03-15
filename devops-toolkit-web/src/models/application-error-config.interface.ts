@@ -5,4 +5,6 @@ export interface IApplicationErrorConfig {
   DlqName: string;
   Description: string;
   DlqErrorCount: number;
+  ImageKey?: string;
+  FileToUpload?: File;
 }

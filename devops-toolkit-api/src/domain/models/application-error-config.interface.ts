@@ -4,4 +4,5 @@ export interface IApplicationErrorConfig {
   Description: string;
   DlqName: string;
   DlqErrorCount?: number;
+  ImageKey?: string;
 }

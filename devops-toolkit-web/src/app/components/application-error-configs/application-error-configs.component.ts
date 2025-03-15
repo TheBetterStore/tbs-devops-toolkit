@@ -39,6 +39,7 @@ export class ApplicationErrorConfigsComponent {
   infoMsg: string = "";
 
   showDialog: boolean = false;
+  showImageDialog: boolean = false;
 
   applicationErrorConfigs: IApplicationErrorConfig[] = [];
   selectedApplicationErrorConfigs!: IApplicationErrorConfig[] | null;
@@ -144,17 +145,32 @@ export class ApplicationErrorConfigsComponent {
         this.applicationErrorConfigs.push(this.applicationErrorConfig);
       }
 
-      this.applicationErrorService.saveAppErrorConfig(this.applicationErrorConfig)
+      const config = this.applicationErrorConfig;
+      this.applicationErrorService.saveAppErrorConfig(config)
         .subscribe(
           p => {
-            self.messageService.add({
-              severity: 'success',
-              summary: 'Success',
-              detail: "Application saved",
-              life: 5000
-            });
-            self.errorMsg = '';
-            self.isLoading = false;
+            // Now, upload image
+            this.applicationErrorService.getDocsPresignedUrl(config.ImageKey || '', 'PUT')
+              .subscribe(
+                q => {
+                  console.log('File to upload?', config.FileToUpload);
+                  if(config.FileToUpload) {
+                    this.applicationErrorService.uploadFile(config.FileToUpload, q.s3PresignedUrl)
+                      .subscribe(
+                        q => {
+                          console.log('File uploaded', q);
+                        }
+                      )
+                  }
+                  self.errorMsg = '';
+                  self.isLoading = false;
+                  self.messageService.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: "Application saved",
+                    life: 5000
+                  });
+                })
           },
           e => {
             console.log(e);
@@ -183,48 +199,17 @@ export class ApplicationErrorConfigsComponent {
     return index;
   }
 
-  uploadFile(event: any) {
+  selectFileToUpload(event: any) {
     console.log(event);
     const file: File = event.target.files[0];
-    console.log(file);
     if(file) {
       console.log(file.name);
-      this.getDocsPresignedUrl(file);
+      this.applicationErrorConfig.FileToUpload = file;
+      this.applicationErrorConfig.ImageKey = `${this.applicationErrorConfig.ApplicationId}/${file.name}`;
     }
   }
 
-  getDocsPresignedUrl(file: File) {
-    const self = this;
-    self.isLoading = true;
-    this.applicationErrorService.getDocsPresignedUrl(file.name)
-      .subscribe(
-        p => {
-          const formData = new FormData();
-          formData.append("file", file);
-          const upload = self.http.put(p.s3PresignedUrl, file, {headers:  {'skip': 'true'}})
-            .subscribe(
-              q => {
-                console.log(q);
-                self.errorMsg = '';
-                self.isLoading = false;
-              }
-            )
-
-        },
-        e => {
-          console.log(e);
-          self.messageService.add({
-            severity: 'error',
-            summary: 'Status retrieval failed',
-            detail: e.message,
-            life: 5000
-          });
-          self.errorMsg = e.message;
-          self.isLoading = false;
-        },
-        () => {
-        }
-      );
+  viewImage(imageKey: string) {
+    console.log(imageKey);
   }
-
 }

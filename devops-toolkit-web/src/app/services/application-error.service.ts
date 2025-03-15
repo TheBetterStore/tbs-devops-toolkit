@@ -42,11 +42,15 @@ export class ApplicationErrorService extends BaseService {
     const region = this.regionService.getRegion();
     a.Region = region;
 
+    // First, backup for later upload
+    const obj: IApplicationErrorConfig = {...a}; // Copy object, then remove file
+    obj.FileToUpload = undefined;
+
     let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
 
     console.log('Calling PUT on url:' + url + " with body: ", a);
     const result$ = this.http
-      .put(url, a)
+      .put(url, obj)
       .pipe(catchError(this.handleError));
     return result$;
   }
@@ -63,8 +67,8 @@ export class ApplicationErrorService extends BaseService {
     return result$;
   }
 
-  getDocsPresignedUrl(filename: string): Observable<any> {
-    let url = `${environment.apiBaseUrl}/v1/docs/uploadsignedurl?filename=${filename}`;
+  getDocsPresignedUrl(s3Key: string, type: 'GET' | 'PUT'): Observable<any> {
+    let url = `${environment.apiBaseUrl}/v1/docs/uploadsignedurl?key=${s3Key}&type=${type}`;
 
     console.log('Calling GET on url:' + url);
     const codes$ = this.http
@@ -72,7 +76,17 @@ export class ApplicationErrorService extends BaseService {
       .pipe(catchError(this.handleError));
     return codes$
   }
+
+  uploadFile(file: File, url: string) {
+    console.log('Calling PUT on url:' + url + " with body: ", file.name);
+    const result$ = this.http
+      .put(url, file, {headers:  {'skip': 'true'}})
+      .pipe(catchError(this.handleError));
+    return result$;
+  }
+
 }
+
 
 function mapConfigs(r: any) {
   let x: IApplicationErrorConfig[] =r.Items;
