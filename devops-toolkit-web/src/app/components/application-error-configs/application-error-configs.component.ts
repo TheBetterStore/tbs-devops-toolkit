@@ -68,8 +68,34 @@ export class ApplicationErrorConfigsComponent {
     .subscribe(
       p => {
         self.applicationErrorConfigs = p;
-        self.errorMsg = '';
-        self.isLoading = false;
+        this.applicationErrorService.getDlqErrorCounts()
+          .subscribe(
+            q => {
+              console.log(q)
+
+              for (let i = 0; i < q.length; i++) {  // Access object[key] here
+                let dlqName = q[i].dlqName;
+                let obj = self.applicationErrorConfigs.find(o => o.DlqName == dlqName);
+                console.log(obj);
+                if(obj) {
+                  obj.DlqErrorCount = q[i].itemCount || 0;
+                }
+              }
+              self.errorMsg = '';
+              self.isLoading = false;
+            },
+            e1 => {
+              console.log(e1);
+              self.messageService.add({
+                severity: 'error',
+                summary: 'Error count retrieval failed',
+                detail: e1.message,
+                life: 5000
+              });
+              self.errorMsg = e1.message;
+              self.isLoading = false;
+            }
+          )
       },
       e => {
         console.log(e);
