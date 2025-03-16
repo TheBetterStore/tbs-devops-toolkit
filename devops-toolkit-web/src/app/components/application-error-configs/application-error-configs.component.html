@@ -41,7 +41,7 @@
                 <td>{{ rec.Description }} </td>
                 <td><span class="mylink" (click)="viewImage(rec.ImageKey)">View Image</span> </td>
                 <td>{{ rec.DlqName }} </td>
-                <td>{{ rec.DlqErrorCount}}</td>
+                <td><a href="/app-errors?dlqName={{rec.DlqName}}&applicationId={{rec.ApplicationId}}" title="{{rec.DlqErrorCount}}">{{ rec.DlqErrorCount}}</a></td>
                 <td>
 
                   <p-button

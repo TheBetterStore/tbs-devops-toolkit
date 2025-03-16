@@ -16,6 +16,17 @@ export class ApplicationErrorService extends BaseService {
     super();
   }
 
+  getDlqErrors(dlqName: string): Observable<any> {
+    let url = `${environment.sreApiBaseUrl}/v1/dlqerrors?dlqName=${dlqName}`;
+
+    console.log('Calling GET on url: ' + url);
+    const errors$ = this.http
+      .get(url)
+      .pipe(map(mapDlqErrors))
+      .pipe(catchError(this.handleError));
+    return errors$;
+  }
+
   getDlqErrorCounts(): Observable<any> {
     let url = `${environment.sreApiBaseUrl}/v1/dlqerrors/count`;
 
@@ -96,6 +107,11 @@ export class ApplicationErrorService extends BaseService {
     return result$;
   }
 
+}
+
+function mapDlqErrors(r: any) {
+  console.log(r);
+  return r.Items;
 }
 
 function mapDlqErrorCounts(r: any) {
