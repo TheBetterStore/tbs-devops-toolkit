@@ -5,6 +5,7 @@ import {BaseService} from "./base.service";
 import {environment} from "../../environments/environment";
 import {catchError, map, Observable} from "rxjs";
 import {IApplicationErrorCode} from "../../models/application-error-code.interface";
+import {IApplicationErrorConfig} from "../../models/application-error-config.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -15,14 +16,34 @@ export class ApplicationErrorService extends BaseService {
     super();
   }
 
-  getAppErrorConfigs() {
+  getDlqErrors(dlqName: string): Observable<any> {
+    let url = `${environment.sreApiBaseUrl}/v1/dlqerrors?dlqName=${dlqName}`;
+
+    console.log('Calling GET on url: ' + url);
+    const errors$ = this.http
+      .get(url)
+      .pipe(map(mapDlqErrors))
+      .pipe(catchError(this.handleError));
+    return errors$;
+  }
+
+  getDlqErrorCounts(): Observable<any> {
+    let url = `${environment.sreApiBaseUrl}/v1/dlqerrors/count`;
+
+    console.log('Calling GET on url:' + url);
+    const codes$ = this.http
+      .get(url)
+      .pipe(map(mapDlqErrorCounts))
+      .pipe(catchError(this.handleError));
+    return codes$;
+  }
+
+  getAppErrorConfigs(): Observable<any> {
     let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
 
     console.log('Calling GET on url:' + url);
     const rules$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapConfigs))
       .pipe(catchError(this.handleError));
     return rules$;
@@ -33,12 +54,27 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling GET on url:' + url);
     const codes$ = this.http
-      .get(url, {headers: {
-          skip: 'true'
-        }})
+      .get(url)
       .pipe(map(mapCodes))
       .pipe(catchError(this.handleError));
     return codes$;
+  }
+
+  saveAppErrorConfig(a: IApplicationErrorConfig) {
+    const region = this.regionService.getRegion();
+    a.Region = region;
+
+    // First, backup for later upload
+    const obj: IApplicationErrorConfig = {...a}; // Copy object, then remove file
+    obj.FileToUpload = undefined;
+
+    let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
+
+    console.log('Calling PUT on url:' + url + " with body: ", a);
+    const result$ = this.http
+      .put(url, obj)
+      .pipe(catchError(this.handleError));
+    return result$;
   }
 
   saveAppErrorCode(a: IApplicationErrorCode) {
@@ -48,21 +84,54 @@ export class ApplicationErrorService extends BaseService {
 
     console.log('Calling PUT on url:' + url + " with body: ", a);
     const result$ = this.http
-      .put(url, a,{headers: {
-          skip: 'true'
-        }})
+      .put(url, a)
       .pipe(catchError(this.handleError));
     return result$;
   }
+
+  getDocsPresignedUrl(s3Key: string, type: 'GET' | 'PUT'): Observable<any> {
+    let url = `${environment.apiBaseUrl}/v1/docs/uploadsignedurl?key=${s3Key}&type=${type}`;
+
+    console.log('Calling GET on url:' + url);
+    const codes$ = this.http
+      .get(url)
+      .pipe(catchError(this.handleError));
+    return codes$
+  }
+
+  uploadFile(file: File, url: string) {
+    console.log('Calling PUT on url:' + url + " with body: ", file.name);
+    const result$ = this.http
+      .put(url, file, {headers:  {'skip': 'true'}})
+      .pipe(catchError(this.handleError));
+    return result$;
+  }
+
+}
+
+function mapDlqErrors(r: any) {
+  console.log(r);
+  return r.Items;
+}
+
+function mapDlqErrorCounts(r: any) {
+  console.log(r);
+  return r.Items;
 }
 
 function mapConfigs(r: any) {
+  let x: IApplicationErrorConfig[] =r.Items;
+  let y = x.map(mapConfig);
+  return y;
+}
+
+function mapConfig(r: IApplicationErrorConfig): IApplicationErrorConfig {
+  r.Id = r.ApplicationId;
   return r;
 }
 
 function mapCodes(r: any): IApplicationErrorCode[] {
   let x: IApplicationErrorCode[] =r.Items;
-  //r.map(mapConfig)
   let y = x.map(mapCode);
   console.log(y);
   return y;

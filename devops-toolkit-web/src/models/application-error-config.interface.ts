@@ -1,7 +1,10 @@
 export interface IApplicationErrorConfig {
+  Id?: string;
   ApplicationId: string;
   Region: string;
   DlqName: string;
   Description: string;
-  CurrentCount: number;
+  DlqErrorCount: number;
+  ImageKey?: string;
+  FileToUpload?: File;
 }

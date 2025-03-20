@@ -1,0 +1,102 @@
+<span class="alert">{{errorMsg}}</span>
+<span class="info">{{infoMsg}}</span>
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12 text-center">
+      <h1>Application DLQ Errors</h1>
+    </div>
+  </div>
+  <div class="row top-buffer">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h4>{{ applicationId }}</h4>
+        </div>
+        <div class="card-body">
+          <p-table
+            #dt
+            [value]="lambdaDlqErrors"
+            dataKey="messageId"
+            [rowHover]="true"
+            [rows]="pageSize"
+            [paginator]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+            [showCurrentPageReport]="true"
+            styleClass="p-datatable-striped"
+            [loading]="isLoading">
+            <ng-template pTemplate="header">
+              <tr>
+                <th style="width: 4rem">
+                  <p-tableHeaderCheckbox />
+                </th>
+                <th pSortableColumn="messageId" style="width: 15%">MessageId <p-sortIcon/></th>
+                <th pSortableColumn="requestId" style="width: 15%">RequestId <p-sortIcon/></th>
+                <th pSortableColumn="errorCode" style="width: 10%">ErrorCode <p-sortIcon/></th>
+                <th pSortableColumn="errorMessage" style="width: 30%">ErrorMessage <p-sortIcon/></th>
+                <th style="width: 30%">Payload <p-sortIcon/></th>
+                <th style="width: 10%">Actions <p-sortIcon/></th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-rec>
+              <tr [pEditableRow]="rec">
+                <td>
+                  <p-tableCheckbox [value]="rec" />
+                </td>
+                <td>
+                  {{ rec.messageId }}
+                </td>
+                <td>
+                  {{ rec.requestId }}
+                </td>
+                <td>
+                  {{ rec.errorCode }}
+                </td>
+                <td>
+                  {{ rec.errorMessage }}
+                </td>
+                <td>
+                  <span class="mylink" (click)="viewPayload(rec)">{{jsonToStr(rec.payload)}}</span>
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p-dialog
+    [(visible)]="showDialog"
+    [style]="{ width: '860px' }"
+    header="Product Details"
+    [modal]="true"
+    styleClass="p-fluid">
+    <ng-template pTemplate="content">
+      <div class="field">
+        <label for="messageId">MessageId</label>
+        <input class="form-control"
+               type="text"
+               pInputText
+               id="messageId"
+               [(ngModel)]="lambdaDlqError.messageId"
+               disabled
+               autofocus />
+      </div>
+      <div class="field top-buffer">
+        <label for="payload">Description</label>
+        <textarea class="form-control"
+                  id="payload"
+                  pInputTextarea
+                  [(ngModel)]="payloadStr"
+                  required
+                  rows="20"
+                  cols="20">
+        </textarea>
+      </div>
+    </ng-template>
+  </p-dialog>
+
+</div>
+<p-progressSpinner *ngIf="isLoading" class="tbs-center"></p-progressSpinner>
+<p-toast position="center" class="custom-toast"></p-toast>
+<p-confirmDialog header="Warning" icon="pi pi-exclamation-triangle"></p-confirmDialog>

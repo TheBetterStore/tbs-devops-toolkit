@@ -6,8 +6,10 @@
     "dependencies": {
         "@aws-sdk/client-cloudformation": "^3.485.0",
         "@aws-sdk/client-config-service": "^3.507.0",
+        "@aws-sdk/client-s3": "^3.758.0",
         "@aws-sdk/client-sns": "^3.490.0",
         "@aws-sdk/client-ssm": "^3.478.0",
+        "@aws-sdk/s3-request-presigner": "^3.758.0",
         "aws-sdk": "^2.1692.0",
         "aws-xray-sdk-core": "^3.10.2",
         "esbuild": "^0.14.14",

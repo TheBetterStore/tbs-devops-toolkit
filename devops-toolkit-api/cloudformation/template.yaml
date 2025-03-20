@@ -40,6 +40,30 @@ Parameters:
 
 Resources:
 
+  DocsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - '*'
+            AllowedMethods:
+              - 'PUT'
+              - 'POST'
+              - 'GET'
+              - 'HEAD'
+            AllowedOrigins:
+              - '*'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
   AuditSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
@@ -71,6 +95,37 @@ Resources:
               - "sts:AssumeRole"
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  GetDocsPresignedUrlLambdaExcecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-DocsPresignedUrlPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3PutPolicy
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  Fn::Join:
+                    - ''
+                    - - !GetAtt DocsBucket.Arn
+                      - '/*'
 
   CFLambdaExcecutionRole:
     Type: AWS::IAM::Role
@@ -322,6 +377,46 @@ Resources:
         PointInTimeRecoveryEnabled: false # Set to true if protection is needed
 #      SSESpecification: # Enable for production environments
 #        SSEEnabled: true
+
+  GetDocsPresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 100
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: AllAtOnce
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref GetDocsPresignedUrlFunctionLogGroup
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt GetDocsPresignedUrlLambdaExcecutionRole.Arn
+      Description: Retrieve Application Error Configs.
+      Environment:
+        Variables:
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          DOCS_BUCKET_NAME: !Ref DocsBucket
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: 'es2020'
+        Sourcemap: true
+        EntryPoints:
+          - src/application/handlers/get-docs-presignedurl/index.ts
+
+  GetDocsPresignedUrlFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-GetDocsPresignedUrlFunction"
+      RetentionInDays: 365
 
   RetrieveApplicationErrorConfigsFunction:
     Type: AWS::Serverless::Function
@@ -1114,6 +1209,15 @@ Resources:
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
       SourceAccount: !Sub ${AWS::AccountId}
 
+  GetDocsPresignedUrlFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "GetDocsPresignedUrlFunction.Alias"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${DevopsToolkitApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
   DevopsToolkitApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -1147,6 +1251,70 @@ Resources:
           title: !Sub "${AWS::StackName}-api"
           version: "2021-06-10T02:04:23Z"
         paths:
+          /docs/uploadsignedurl:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetDocsPresignedUrlFunction.Arn}:prod/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
           /app-error-configs:
             get:
               security:
@@ -2103,3 +2271,15 @@ Outputs:
   ApiEndpoint:
     Description: "API Gateway endpoint URL for Prod stage"
     Value: !Sub "https://${DevopsToolkitApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  DocsBucketName:
+    Description: DocsBucket Name
+    Value: !Ref DocsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}:DocsBucket:Name'
+
+  DocsBucketDomainName:
+    Description: DocsBucket DomainName
+    Value: !GetAtt DocsBucket.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}:DocsBucket:DomainName'
