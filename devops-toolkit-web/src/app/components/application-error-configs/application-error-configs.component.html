@@ -37,9 +37,9 @@
             </ng-template>
             <ng-template pTemplate="body" let-rec>
               <tr [pEditableRow]="rec">
-                <td><a href="/app-error-codes?applicationId={{rec.ApplicationId}}" title="{{rec.ApplicationId}}">{{ rec.ApplicationId }}</a></td>
+                <td><a href="/app-error-codes?applicationId={{rec.ApplicationId}}" title="Click to view error codes...">{{ rec.ApplicationId }}</a></td>
                 <td>{{ rec.Description }} </td>
-                <td><span class="mylink" (click)="viewImage(rec.ImageKey)">View Image</span> </td>
+                <td><span class="mylink" (click)="viewImage(rec)" title="{{rec.ImageKey}}">View Image</span> </td>
                 <td>{{ rec.DlqName }} </td>
                 <td><a href="/app-errors?dlqName={{rec.DlqName}}&applicationId={{rec.ApplicationId}}" title="{{rec.DlqErrorCount}}">{{ rec.DlqErrorCount}}</a></td>
                 <td>
@@ -72,13 +72,13 @@
                 severity="success"
                 label="New"
                 icon="pi pi-plus"
-                class="btn mr-2"
+                class="btn btn-sm mr-2"
                 (onClick)="openNew()" />
               <p-button
                 severity="danger"
                 label="Delete"
                 icon="pi pi-trash"
-                class="btn"
+                class="btn btn-sm"
                 (onClick)="deleteSelectedRecs()"
                 [disabled]="!selectedRecs || !selectedRecs.length" />
             </ng-template>
@@ -162,9 +162,9 @@
 
 
   <p-dialog
+    *ngIf="applicationErrorConfig?.ImageKey"
     [(visible)]="showImageDialog"
-    [style]="{ width: '1024px' }"
-    header="Image"
+    header="{{applicationErrorConfig.ImageKey}}"
     [modal]="true"
     styleClass="p-fluid">
     <ng-template pTemplate="content">

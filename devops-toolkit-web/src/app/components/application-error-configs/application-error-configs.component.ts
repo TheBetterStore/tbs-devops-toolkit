@@ -85,13 +85,6 @@ export class ApplicationErrorConfigsComponent {
               self.isLoading = false;
             },
             e1 => {
-              console.log(e1);
-              self.messageService.add({
-                severity: 'error',
-                summary: 'Error count retrieval failed',
-                detail: e1.message,
-                life: 5000
-              });
               self.errorMsg = e1.message;
               self.isLoading = false;
             }
@@ -237,12 +230,13 @@ export class ApplicationErrorConfigsComponent {
     }
   }
 
-  viewImage(imageKey: string) {
+  viewImage(rec: IApplicationErrorConfig) {
     const self = this;
-    const config = self.applicationErrorConfig;
-    console.log(imageKey);
+    this.applicationErrorConfig = rec;
+    console.log(rec.ImageKey);
 
-    this.applicationErrorService.getDocsPresignedUrl(imageKey || '', 'GET')
+    self.isLoading = true;
+    this.applicationErrorService.getDocsPresignedUrl(rec.ImageKey || '', 'GET')
       .subscribe(
         q => {
           console.log(q);
@@ -254,6 +248,7 @@ export class ApplicationErrorConfigsComponent {
         },
         e=> {
           console.log(e);
+          self.isLoading = false;
         })
   }
 

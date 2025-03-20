@@ -30,6 +30,14 @@
         </div>
       </li>
 
+      <li *ngIf="isViewer()" class="nav-item dropdown">
+        <a class="nav-link" dropdown-toggle  id="navbarDropdownErrors"
+           role="button" data-bs-toggle="dropdown" aria-expanded="false">Error Mgmt</a>
+        <div class="dropdown-menu dropdown-primary" aria-labelledby="navbarDropdownErrors">
+          <a class="dropdown-item" [routerLink]="'/app-error-configs'">Application Errors</a>
+        </div>
+      </li>
+
       <li class="nav-item">
         <a class="nav-link" href="about">About</a>
       </li>

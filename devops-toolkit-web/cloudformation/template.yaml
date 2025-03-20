@@ -28,6 +28,10 @@ Parameters:
   ApiDomain:
     Type: String
 
+  DocsS3BucketDomainName:
+    Type: String
+    Default: s3.ap-southeast-2.amazonaws.com
+
   GeoRestrictionCodes:
     Type: CommaDelimitedList
     Default: "AU,GB,NZ,US"
@@ -164,7 +168,7 @@ Resources:
         Name: !Sub ${AWS::StackName}-SecurityHeaders
         SecurityHeadersConfig:
           ContentSecurityPolicy:
-            ContentSecurityPolicy: !Sub default-src 'none';font-src fonts.gstatic.com 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; connect-src ${ApiDomain} cognito-idp.ap-southeast-2.amazonaws.com cognito-identity.ap-southeast-2.amazonaws.com *.google-analytics.com; worker-src blob:; object-src 'none';frame-src; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+            ContentSecurityPolicy: !Sub default-src 'none';font-src fonts.gstatic.com 'self'; img-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' fonts.googleapis.com; connect-src *.${DocsS3BucketDomainName} ${ApiDomain} cognito-idp.ap-southeast-2.amazonaws.com cognito-identity.ap-southeast-2.amazonaws.com *.google-analytics.com; worker-src blob:; object-src 'none';frame-src; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
             Override: true
           StrictTransportSecurity:
             AccessControlMaxAgeSec: 63072000

@@ -2271,3 +2271,15 @@ Outputs:
   ApiEndpoint:
     Description: "API Gateway endpoint URL for Prod stage"
     Value: !Sub "https://${DevopsToolkitApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+
+  DocsBucketName:
+    Description: DocsBucket Name
+    Value: !Ref DocsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}:DocsBucket:Name'
+
+  DocsBucketDomainName:
+    Description: DocsBucket DomainName
+    Value: !GetAtt DocsBucket.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}:DocsBucket:DomainName'
