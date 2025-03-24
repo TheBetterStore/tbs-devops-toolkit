@@ -14,7 +14,6 @@ import {
   GetParameterCommandOutput, DescribeParametersCommandOutput,
 } from '@aws-sdk/client-ssm';
 import {injectable} from 'inversify';
-import {Logger} from '../logger';
 
 @injectable()
 /**
@@ -49,7 +48,7 @@ export class SsmClient implements ISSMClient {
     return response;
   }
   async describeParameters(region: string, input: DescribeParametersCommandInput): Promise<DescribeParametersCommandOutput> {
-    Logger.debug(`Querying params with region: ${region}`);
+    console.debug(`Querying params with region: ${region}`);
     const client = new SSMClient({region: region});
     const command = new DescribeParametersCommand(input);
     const response = await client.send(command);

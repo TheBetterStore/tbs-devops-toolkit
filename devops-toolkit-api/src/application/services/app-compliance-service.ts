@@ -4,7 +4,6 @@ import {IDynamoDBClient} from '../../infrastructure/interfaces/dynamodb-client.i
 import TYPES from '../../infrastructure/types';
 import {ISSMClient} from '../../infrastructure/interfaces/ssm-client.interface';
 import {GetParameterCommandInput} from '@aws-sdk/client-ssm';
-import {Logger} from '../../infrastructure/logger';
 import container from '../handlers/describe-compliancerules/container';
 import {IConfigClient} from '../../infrastructure/interfaces/config-client.interface';
 import {ComplianceByConfigRule, DescribeComplianceByConfigRuleCommandInput} from '@aws-sdk/client-config-service';
@@ -45,7 +44,7 @@ export class AppComplianceService implements IAppComplianceService {
     const p = await this.ssmClient.getParameter(region, param);
     const rulesFilter: string[] = JSON.parse(p?.Parameter?.Value || '[]');
 
-    Logger.debug('Using filters:', rulesFilter);
+    console.debug('Using filters:', rulesFilter);
 
     const configClient = container.get<IConfigClient>(TYPES.IConfigClient);
 
@@ -54,7 +53,7 @@ export class AppComplianceService implements IAppComplianceService {
     };
 
     const r: ComplianceByConfigRule[] = await configClient.describeComplianceByConfigRuleCommand(region, q1);
-    Logger.debug('Unfiltered rules:', r);
+    console.debug('Unfiltered rules:', r);
 
     const filteredResults: ComplianceByConfigRule[] = [];
 
@@ -75,19 +74,19 @@ export class AppComplianceService implements IAppComplianceService {
 
     // Now get prev
     const previousNoncompliantRuleCounts = await this.getPreviousNoncompliantRuleCounts();
-    Logger.debug('previousNoncompliantRuleCounts: ', JSON.stringify(previousNoncompliantRuleCounts, null, 2));
+    console.debug('previousNoncompliantRuleCounts: ', JSON.stringify(previousNoncompliantRuleCounts, null, 2));
     for (let i = 0; i < filteredResults.length; i++) {
       const filteredResult: any = filteredResults[i];
       const ruleName =filteredResult.ConfigRuleName;
       const previousCountItems = previousNoncompliantRuleCounts.Items?.filter((x)=> x.Rule == ruleName);
-      Logger.debug('previousCountItems: ', JSON.stringify(previousCountItems, null, 2));
+      console.debug('previousCountItems: ', JSON.stringify(previousCountItems, null, 2));
       let previousCount = 0;
       let previousUpdatedTime = '';
       if (previousCountItems && previousCountItems.length == 1) {
         previousCount = Number(previousCountItems[0]?.Count || '0' );
         previousUpdatedTime = (previousCountItems[0]?.LastUpdated || '') as string;
       }
-      Logger.debug('previousCount: ', previousCount);
+      console.debug('previousCount: ', previousCount);
       filteredResult['PreviousNoncomplianceCount'] = previousCount;
       filteredResult['PreviousUpdatedTime'] = previousUpdatedTime;
     }
@@ -119,7 +118,7 @@ export class AppComplianceService implements IAppComplianceService {
     };
 
     const r: ComplianceByConfigRule[] = await configClient.describeComplianceByConfigRuleCommand(region, q1);
-    Logger.debug('Unfiltered rules:', r);
+    console.debug('Unfiltered rules:', r);
 
     const currentTime = new Date();
     for (let i = 0; i < r.length; i++) {

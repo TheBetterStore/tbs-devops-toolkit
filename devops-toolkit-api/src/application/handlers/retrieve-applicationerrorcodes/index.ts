@@ -11,15 +11,15 @@ import {IAppErrorService} from '../../services/app-error-service.interface';
 
 console.log('INFO - lambda is cold-starting.');
 exports.handler = async (event: APIGatewayEvent) => {
-  Logger.info('Entered retrieve-applicationerrorcodes handler', event);
+  console.info('Entered retrieve-applicationerrorcodes handler', event);
 
   if (!event.requestContext || !event.requestContext.authorizer) {
     return HttpUtils.buildJsonResponse(400, {message: 'Missing authorizer'}, event?.headers?.origin + '');
   }
   const userClaims: IClaims = event.requestContext.authorizer.claims;
-  Logger.debug('Received userClaims:', userClaims);
+  console.debug('Received userClaims:', userClaims);
   if (!AuthUtils.isViewer(userClaims)) {
-    Logger.info('Not authorised');
+    console.info('Not authorised');
     const response = HttpUtils.buildJsonResponse(401, {message: 'Not authorised'}, event?.headers?.origin + '');
     return response;
   }
@@ -38,10 +38,10 @@ exports.handler = async (event: APIGatewayEvent) => {
     const svc = container.get<IAppErrorService>(TYPES.IAppErrorService);
     const errorCodes = await svc.retrieveApplicationErrorCodes(applicationId);
 
-    Logger.debug('Error codes:', errorCodes);
+    console.debug('Error codes:', errorCodes);
 
     const response = HttpUtils.buildJsonResponse(200, errorCodes, event?.headers?.origin + '');
-    Logger.info('Exiting handler');
+    console.info('Exiting handler');
     return response;
   } catch (e: any) {
     if (e instanceof InvalidDataError) {
