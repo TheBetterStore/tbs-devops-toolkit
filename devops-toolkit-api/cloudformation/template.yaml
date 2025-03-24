@@ -33,6 +33,11 @@ Parameters:
     AllowedValues: [DEBUG, INFO, WARN]
     Default: INFO
 
+  DescribeStacksFunctionAppLogLevel:
+    Type: String
+    AllowedValues: [ TRACE, DEBUG, INFO, WARN, ERROR, FATAL ]
+    Default: DEBUG
+
   WhitelistIPs:
     Type: CommaDelimitedList
     Description: Allow specific IP ranges outside of WAF Geoblocked zone
@@ -722,7 +727,7 @@ Resources:
       LoggingConfig:
         LogGroup: !Ref DescribeStacksFunctionLogGroup
         LogFormat: JSON
-        ApplicationLogLevel: !Ref AppLoggingLevel
+        ApplicationLogLevel: !Ref DescribeStacksFunctionAppLogLevel
         SystemLogLevel: !Ref SystemLogLevel
       Role: !GetAtt CFLambdaExcecutionRole.Arn
       Description: Retrieve CF stacks.
