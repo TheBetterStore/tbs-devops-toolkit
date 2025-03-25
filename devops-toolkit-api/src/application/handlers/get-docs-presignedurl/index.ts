@@ -1,7 +1,6 @@
 import 'reflect-metadata';
 import {APIGatewayEvent} from 'aws-lambda';
 import {IClaims} from '../../../domain/models/claims.interface';
-import {Logger} from '../../../infrastructure/logger';
 import {HttpUtils} from '../../../infrastructure/http-utils';
 import {AuthUtils} from '../../../infrastructure/auth-utils';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
@@ -22,9 +21,9 @@ exports.handler = async (event: APIGatewayEvent) => {
     return HttpUtils.buildJsonResponse(400, {message: 'Missing authorizer'}, event?.headers?.origin + '');
   }
   const userClaims: IClaims = event.requestContext.authorizer.claims;
-  Logger.debug('Received userClaims:', userClaims);
+  console.debug('Received userClaims:', userClaims);
   if (!AuthUtils.isViewer(userClaims)) {
-    Logger.info('Not authorised');
+    console.info('Not authorised');
     const response = HttpUtils.buildJsonResponse(401, {message: 'Not authorised'}, event?.headers?.origin + '');
     return response;
   }

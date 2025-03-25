@@ -36,6 +36,9 @@ export class ChangesetComponent {
 
   sub: any;
 
+  selectedResourceChange: any;
+  changesJson: string = '';
+
   constructor(private stackService: StackService,
               private parameterService: ParameterService,
               private router: Router,
@@ -109,9 +112,21 @@ export class ChangesetComponent {
       );
   }
 
+
   onReturnClicked() {
     console.log(this.changeset);
     this.router.navigate(['/stacks', this.changeset.StackName]);
   }
 
+  onRowSelect(event: any) {
+    console.log(event);
+    this.selectedResourceChange = event.data.ResourceChange;
+    this.changesJson = JSON.stringify(this.selectedResourceChange.Details, null, 2);
+  }
+
+  onRowUnselect(event: any) {
+    console.log(event);
+    this.selectedResourceChange = event.data.ResourceChange;
+    this.changesJson = JSON.stringify(this.selectedResourceChange.Details, null, 2);
+  }
 }

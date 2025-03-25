@@ -4,6 +4,7 @@ import {catchError, map, Observable} from "rxjs";
 import {BaseService} from "./base.service";
 import {environment} from "../../environments/environment";
 import {RegionService} from "./region.service";
+import {IStack} from "../../models/stack.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -35,14 +36,13 @@ export class StackService extends BaseService {
     return stacks$;
   }
 
-  createChangeSet(stackName: string) {
+  createChangeSet(stack: IStack) {
     const region = this.regionService.getRegion();
-    console.log(stackName);
     let url = `${environment.apiBaseUrl}/v1/changesets`;
 
     const body = {
       region: region,
-      stackName: stackName
+      stack: stack
     }
     console.log('Calling POST on url:' + url);
     console.log('Using body', body)
@@ -117,5 +117,16 @@ export class StackService extends BaseService {
 }
 
 function mapStacks(s: any) {
+
+  // iterate stacks
+  for(let i = 0; i < s.length; i++) {
+    const stack = s[i];
+    if(stack.Parameters) {
+      for(let j = 0; j < stack.Parameters.length; j++) {
+        const p = stack.Parameters[j];
+        p.OriginalValue = p.ParameterValue;
+      }
+    }
+  }
   return s;
 }
