@@ -24,50 +24,53 @@
   </div>
 
   <div class="row top-buffer">
-    <div class="col-12">
+    <div class="col-7">
       <div class="card">
-        <div class="card-header"><h5>Changes</h5></div>
+        <div class="card-header"><h5>Resource Changes</h5></div>
         <div class="card-body">
           <p-table
             #dt1
             [value]="changeset?.Changes"
             dataKey="LogicalResourceId"
+            (onRowSelect)="onRowSelect($event)"
+            (onRowUnselect)="onRowUnselect($event)"
             [rows]="pageSize"
             styleClass="p-datatable-striped"
+            selectionMode="single"
             [scrollable]="true" scrollHeight="400px" [virtualScroll]="true" [virtualScrollItemSize]="46"
             [loading]="isLoading">
 
             <ng-template pTemplate="header">
               <tr style="height:30px">
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:10rem">
                   <div class="flex align-items-center">
                     Logical Resource Id
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:10rem">
                   <div class="flex align-items-center">
                     Resource Type
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:6rem">
                   <div class="flex align-items-center">
                     Action
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:8rem">
                   <div class="flex align-items-center">
                     Replacement
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:8rem">
                   <div class="flex align-items-center">
                     Scope
                   </div>
                 </th>
               </tr>
             </ng-template>
-            <ng-template pTemplate="body" let-rec>
-              <tr class="table-sm">
+            <ng-template pTemplate="body" let-rec ]>
+              <tr class="table-sm" [pSelectableRow]="rec">
                 <td>{{ rec.ResourceChange.LogicalResourceId }}</td>
                 <td>{{ rec.ResourceChange.ResourceType }}</td>
                 <td>{{ rec.ResourceChange.Action }}</td>
@@ -76,6 +79,18 @@
               </tr>
             </ng-template>
           </p-table>
+        </div>
+      </div>
+    </div>
+    <div class="col-5">
+      <div class="card">
+        <div class="card-header">
+          <h5>Change Details</h5>
+        </div>
+        <div class="card-body">
+          <div *ngIf="selectedResourceChange">
+            <textarea class="form-control" cols="40" rows="20">{{changesJson}}</textarea>
+          </div>
         </div>
       </div>
     </div>
