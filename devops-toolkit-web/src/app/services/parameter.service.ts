@@ -6,7 +6,7 @@ import {BaseService} from "./base.service";
 import {MessageService} from "primeng/api";
 import {IParameterFilter} from "../../models/parameter-filter.interface";
 import {RegionService} from "./region.service";
-import {IParameter} from "../../models/parameter.interface";
+import {ISSMParameter} from "../../models/ssm-parameter.interface";
 
 @Injectable({
   providedIn: 'root'
@@ -78,9 +78,9 @@ function mapParameters(r: any) {
   return r;
 }
 
-function mapParam(r: any): IParameter {
+function mapParam(r: any): ISSMParameter {
   const d = new Date(r.LastModifiedDate);
-  const s: IParameter = {
+  const s: ISSMParameter = {
     ARN: r.ARN,
     DataType: r.DataType,
     LastModifiedDate: r.LastModifiedDate,

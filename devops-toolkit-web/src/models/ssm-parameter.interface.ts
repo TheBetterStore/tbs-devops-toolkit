@@ -1,4 +1,4 @@
-export interface IParameter {
+export interface ISSMParameter {
   ARN: string;
   DataType: string;
   LastModifiedDate: any;

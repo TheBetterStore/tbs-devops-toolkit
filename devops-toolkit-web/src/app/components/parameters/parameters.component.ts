@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import {IParameter} from "../../../models/parameter.interface";
+import {ISSMParameter} from "../../../models/ssm-parameter.interface";
 import {ParameterService} from "../../services/parameter.service";
 import {ActivatedRoute, Router} from "@angular/router";
 import {ConfirmationService, MessageService} from "primeng/api";
@@ -31,9 +31,9 @@ export class ParametersComponent {
   errorMsg: string = "";
   infoMsg: string = "";
 
-  parameters: IParameter[] = [];
+  parameters: ISSMParameter[] = [];
   parameterResponse: any;
-  selectedParam: IParameter = {
+  selectedParam: ISSMParameter = {
     ARN: "",
     DataType: "",
     LastModifiedDate: undefined,
@@ -155,7 +155,7 @@ export class ParametersComponent {
     this.displayParamDialog = false;
   }
 
-  editParam(param: IParameter) {
+  editParam(param: ISSMParameter) {
     this.selectedParam = param;
     this.displayParamDialog = true;
   }

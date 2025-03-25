@@ -7,7 +7,7 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-4">
+    <div class="col-6">
       <div class="card">
         <div class="card-header">
           <h4>Stack Properties</h4>
@@ -39,14 +39,6 @@
           </div>
           <div class="row top-buffer">
             <div class="col-3">
-              <span class="strong">Security Tag:</span>
-            </div>
-            <div class="col-8">
-              <span>{{securityTag + ""}}</span>
-            </div>
-          </div>
-          <div class="row top-buffer">
-            <div class="col-3">
               <span class="strong">Drift Status:</span>
             </div>
             <div class="col-8">
@@ -57,11 +49,80 @@
       </div>
       <div class="card top-buffer">
         <div class="card-header">
-          <h5>Stack Input Parameters</h5>
+          <h5>Stack SSM Parameters</h5>
         </div>
         <div class="card-body">
+          <div class="overflow-auto">
+            <p-table
+              #dt1
+              [value]="parameters"
+              dataKey="Name"
+              [rows]="pageSize"
+              selectionMode="single"
+              [showCurrentPageReport]="true"
+              styleClass="p-datatable-striped"
+              [globalFilterFields]="['Name', 'Type', 'Value']"
+              [loading]="isLoading">
+
+              <ng-template pTemplate="header">
+                <tr style="height:30px">
+                  <th scope="col" style="min-width:9rem">
+                    <div class="flex align-items-center">
+                      Name
+                      <p-columnFilter type="text" field="Name" display="menu"></p-columnFilter>
+                    </div>
+                  </th>
+                  <th scope="col" style="min-width:10rem">
+                    <div class="flex align-items-center">
+                      Type
+                      <p-columnFilter type="text" field="Type" display="menu"></p-columnFilter>
+                    </div>
+                  </th>
+                  <th scope="col" style="min-width:10rem">
+                    <div class="flex align-items-center">
+                      Value
+                      <p-columnFilter type="text" field="Value" display="menu"></p-columnFilter>
+                    </div>
+                  </th>
+                  <th scope="col">Version</th>
+                  <th scope="col">Last Modified</th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-param>
+                <tr class="table-sm" [pSelectableRow]="param">
+                  <td>{{ param.Name }}</td>
+                  <td>{{ param.Type }}</td>
+                  <td *ngIf="param.Type!='String' && param.Type!='StringList'">********</td>
+                  <td *ngIf="param.Type=='String' || param.Type=='StringList'">
+                    <span *ngIf="param.HasChanged" class="changed">{{ param.Value }}</span>
+                    <span *ngIf="!param.HasChanged">{{ param.Value }}</span>
+                  </td>
+                  <td>{{ param.Version }}</td>
+                  <td>{{ param.LastModifiedDateLocalFormatted }}</td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+
+        </div>
+      </div>
+      <div *ngIf="isMaintainer() && securityTag != 'pci' && parameters.length > 0 " class="row top-buffer">
+        <div class="col-12 text-end">
+          <button pButton class="btn btn-outline-success" (click)="createChangeSet()">Create ChangeSet</button>
+          <button *ngIf="hasCreatedChangeSet()" pButton class="btn btn-outline-primary" (click)="viewCreatedChangeSet()">View Created ChangeSet</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-6">
+      <div class="card">
+        <div class="card-header">
+          <h3>Edit Parameters</h3>
+        </div>
+        <div class="card-body">
+
+          <div class="overflow-auto">
           <p-table
-            #dt1
+            #dt2
             [value]="stack?.Parameters"
             dataKey="ParameterKey"
             [rows]="pageSize"
@@ -83,86 +144,32 @@
                     <p-columnFilter type="text" field="ParameterValue" display="menu"></p-columnFilter>
                   </div>
                 </th>
+                <th scope="col" style="min-width:15rem">
+                  <div class="flex align-items-center">
+                    SSM Param Value?
+                    <p-columnFilter type="text" field="ResolvedValue" display="menu"></p-columnFilter>
+                  </div>
+                </th>
+                <th></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-param>
               <tr class="table-sm">
                 <td>{{ param.ParameterKey }}</td>
-                <td><span title="{{ param.ResolvedValue }}">{{ param.ParameterValue }}</span></td>
-              </tr>
-            </ng-template>
-          </p-table>
-          <div *ngIf="isMaintainer() && securityTag != 'pci' && parameters.length > 0 " class="row top-buffer">
-            <div class="col-12 text-end">
-              <button pButton class="btn btn-outline-success" (click)="createChangeSet()">Create ChangeSet</button>
-              <button *ngIf="hasCreatedChangeSet()" pButton class="btn btn-outline-primary" (click)="viewCreatedChangeSet()">View Created ChangeSet</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-8">
-      <div class="card">
-        <div class="card-header">
-          <h4>Stack SSM Parameters</h4>
-        </div>
-        <div class="card-body">
-          <p-table
-            #dt1
-            [value]="parameters"
-            dataKey="Name"
-            [rows]="pageSize"
-            selectionMode="single"
-            [showCurrentPageReport]="true"
-            styleClass="p-datatable-striped"
-            [globalFilterFields]="['Name', 'Type', 'Value']"
-            [loading]="isLoading">
-
-            <ng-template pTemplate="header">
-              <tr style="height:30px">
-                <th scope="col" style="min-width:9rem">
-                  <div class="flex align-items-center">
-                    Name
-                    <p-columnFilter type="text" field="Name" display="menu"></p-columnFilter>
-                  </div>
-                </th>
-                <th scope="col" style="min-width:10rem">
-                  <div class="flex align-items-center">
-                    Type
-                    <p-columnFilter type="text" field="Type" display="menu"></p-columnFilter>
-                  </div>
-                </th>
-                <th scope="col" style="min-width:10rem">
-                  <div class="flex align-items-center">
-                    Value
-                    <p-columnFilter type="text" field="Value" display="menu"></p-columnFilter>
-                  </div>
-                </th>
-                <th scope="col">Version</th>
-                <th scope="col">Last Modified</th>
-                <th></th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-param>
-              <tr class="table-sm" [pSelectableRow]="param">
-                <td>{{ param.Name }}</td>
-                <td>{{ param.Type }}</td>
-                <td *ngIf="param.Type!='String' && param.Type!='StringList'">********</td>
-                <td *ngIf="param.Type=='String' || param.Type=='StringList'">
-                  <span *ngIf="param.HasChanged" class="changed">{{ param.Value }}</span>
-                  <span *ngIf="!param.HasChanged">{{ param.Value }}</span>
-                </td>
-                <td>{{ param.Version }}</td>
-                <td>{{ param.LastModifiedDateLocalFormatted }}</td>
+                <td *ngIf="param.ParameterValue != param.OriginalValue" class="changed"><span>{{ param.ParameterValue }}</span></td>
+                <td *ngIf="param.ParameterValue == param.OriginalValue"><span>{{ param.ParameterValue }}</span></td>
+                <td><span>{{ param.ResolvedValue }}</span></td>
                 <td>
-                  <div class="flex align-items-center justify-content-center gap-2">
-                    <button *ngIf="param.Type=='String' || param.Type=='StringList' " pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editParam(param)"></button>
-                    <button *ngIf="param.Type!='String' && param.Type!='StringList' " pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" disabled></button>
+                  <div *ngIf="isAdmin()" class="flex align-items-center justify-content-center gap-2">
+                    <button *ngIf="isMaintainer()" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editStackParam(param)"></button>
                   </div>
                 </td>
               </tr>
             </ng-template>
           </p-table>
+          </div>
+
+
           <div *ngIf="hasMoreParameters" class="row top-buffer">
             <div class="col-12 text-end">
               <button class="btn btn-outline-primary" (click)="reloadParams()">Reload</button>
@@ -176,14 +183,14 @@
   </div>
 </div>
 
-<p-dialog *ngIf="selectedParam.Name" [(visible)]="displayParamDialog" [style]="{width: '680px'}" header = "Parameter Details"
+<p-dialog *ngIf="selectedSsmParam.Name" [(visible)]="displaySsmParamDialog" [style]="{width: '680px'}" header = "Parameter Details"
           [modal] = "true" styleClass="p-fluid">
   <div class="row top-buffer">
     <div class="col-3">
       <span class="strong">Name:</span>
     </div>
     <div class="col-9">
-      {{selectedParam.Name}}
+      {{selectedSsmParam.Name}}
     </div>
   </div>
   <div class="row top-buffer">
@@ -193,7 +200,7 @@
   </div>
   <div class="row">
     <div class="col-12">
-      <textarea id="description" pInputTextarea [(ngModel)]="selectedParam.Description" disabled rows="3" cols="60"></textarea>
+      <textarea id="description" pInputTextarea [(ngModel)]="selectedSsmParam.Description" disabled rows="3" cols="60"></textarea>
     </div>
   </div>
   <div class="row top-buffer">
@@ -201,7 +208,7 @@
       <span class="strong">Last modified:</span>
     </div>
     <div class="col-9">
-      {{selectedParam.LastModifiedDateLocalFormatted}}
+      {{selectedSsmParam.LastModifiedDateLocalFormatted}}
     </div>
   </div>
   <div class="row top-buffer">
@@ -209,7 +216,7 @@
       <span class="strong">Version:</span>
     </div>
     <div class="col-9">
-      {{selectedParam.Version}}
+      {{selectedSsmParam.Version}}
     </div>
   </div>
   <div class="row top-buffer">
@@ -219,14 +226,47 @@
   </div>
   <div class="row">
     <div class="col-12">
-      <textarea id="value" pInputTextarea [(ngModel)]="selectedParam.Value" rows="3" cols="60"></textarea>
+      <textarea *ngIf="selectedSsmParam.Type=='String' || selectedSsmParam.Type=='StringList'" id="value" pInputTextarea [(ngModel)]="selectedSsmParam.Value" rows="3" cols="60"></textarea>
+      <textarea *ngIf="selectedSsmParam.Type!='String' && selectedSsmParam.Type!='StringList'" pInputTextarea rows="3" cols="60">********</textarea>
     </div>
   </div>
   <div class="row text-center">
     <div class="col-12">
-      <button class="btn btn-primary" (click)="cancelUpdateParam()">Cancel</button>
+      <button class="btn btn-primary" (click)="cancelUpdateSsmParam()">Cancel</button>
       <span>&nbsp;</span>
-      <button class="btn btn-success" (click)="updateParam()">Update</button>
+      <button *ngIf="selectedSsmParam.Type=='String' || selectedSsmParam.Type=='StringList'" class="btn btn-success" (click)="updateSsmParam()">Update</button>
+      <button *ngIf="selectedSsmParam.Type!='String' && selectedSsmParam.Type!='StringList'" class="btn btn-success" disabled>Update</button>
+    </div>
+  </div>
+
+</p-dialog>
+
+<p-dialog *ngIf="selectedStackParam.ParameterKey" [(visible)]="displayStackParamDialog" [style]="{width: '680px'}" header = "Parameter Details"
+          [modal] = "true" styleClass="p-fluid">
+  <div class="row top-buffer">
+    <div class="col-3">
+      <span class="strong">Name:</span>
+    </div>
+    <div class="col-9">
+      {{selectedStackParam.ParameterKey}}
+    </div>
+  </div>
+
+  <div class="row top-buffer">
+    <div class="col-3">
+      <span class="strong">Value:</span>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <textarea id="stackValue" pInputTextarea [(ngModel)]="selectedStackParam.ParameterValue" rows="3" cols="60"></textarea>
+    </div>
+  </div>
+  <div class="row text-center">
+    <div class="col-12">
+      <button class="btn btn-primary" (click)="cancelUpdateStackParam()">Cancel</button>
+      <span>&nbsp;</span>
+      <button class="btn btn-success" (click)="updateStackParam()">Update</button>
     </div>
   </div>
 

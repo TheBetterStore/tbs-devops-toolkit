@@ -57,7 +57,7 @@ exports.handler = async (event: APIGatewayEvent) => {
       console.log(nextToken);
     } while (nextToken);
 
-    console.debug('Result:', stacks);
+    console.debug('Result:', JSON.stringify(stacks));
 
     const response = HttpUtils.buildJsonResponse(200, stacks, event?.headers?.origin + '');
     console.info('Exiting handler');

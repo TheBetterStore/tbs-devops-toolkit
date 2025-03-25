@@ -12,13 +12,14 @@ import {NgIf} from "@angular/common";
 import {StackService} from "../../services/stack.service";
 import {ActivatedRoute, Router} from "@angular/router";
 import {ConfirmationService, MessageService} from "primeng/api";
-import {IStack} from "../../../models/stack.interface";
 import {IParameterFilter} from "../../../models/parameter-filter.interface";
-import {IParameter} from "../../../models/parameter.interface";
+import {ISSMParameter} from "../../../models/ssm-parameter.interface";
 import {ParameterService} from "../../services/parameter.service";
 import {BaseComponent} from "../base.component";
 import {AuthenticationService} from "../../services/authentication.service";
 import {DialogModule} from "primeng/dialog";
+import {IStackParameter} from "../../../models/stack-parameter.interface";
+import {IStack} from "../../../models/stack.interface";
 
 @Component({
   selector: 'app-stack',
@@ -37,9 +38,9 @@ export class StackComponent extends BaseComponent {
 
   stack?: IStack;
 
-  parameters: IParameter[] = [];
+  parameters: ISSMParameter[] = [];
   parameterResponse: any;
-  selectedParam: IParameter = {
+  selectedSsmParam: ISSMParameter = {
     ARN: "",
     DataType: "",
     LastModifiedDate: undefined,
@@ -48,6 +49,12 @@ export class StackComponent extends BaseComponent {
     Value: "",
     Version: 0
   };
+
+  selectedStackParam: IStackParameter = {
+    ParameterKey: "",
+    ParameterValue: ""
+  };
+
   nextToken: string = "";
   maxRowsPerPage = 20;
   pageSize = 20;
@@ -61,7 +68,8 @@ export class StackComponent extends BaseComponent {
 
   securityTag = "";
 
-  displayParamDialog = false;
+  displaySsmParamDialog = false;
+  displayStackParamDialog = false;
   paramSubmitted = false;
 
   constructor(authenticationService: AuthenticationService, private stackService: StackService,
@@ -82,7 +90,7 @@ export class StackComponent extends BaseComponent {
     this.loadStack(this.stackName);
     this.loadParameters(this.stackName, false);
 
-    this.selectedParam = {
+    this.selectedSsmParam = {
       ARN: "",
       DataType: "",
       LastModifiedDate: undefined,
@@ -90,6 +98,11 @@ export class StackComponent extends BaseComponent {
       Type: "",
       Value: "",
       Version: 0
+    };
+
+    this.selectedStackParam = {
+      ParameterKey: "",
+      ParameterValue: ""
     };
   }
 
@@ -106,6 +119,7 @@ export class StackComponent extends BaseComponent {
             const tags = self.stack?.Tags;
             const securityTag = tags.find((x: { Key: string; }) => x.Key == 'security');
             self.securityTag = (securityTag?.Value ? securityTag?.Value : "");
+            console.log(self.stack?.Parameters);
             if(self.stack?.Parameters) {
               self.stack.Parameters.sort((a: any, b: any) => {
                 const x = a.ParameterKey;
@@ -120,6 +134,7 @@ export class StackComponent extends BaseComponent {
               });
             }
           }
+
           self.errorMsg = '';
           self.isLoading = false;
         },
@@ -223,26 +238,36 @@ export class StackComponent extends BaseComponent {
     this.loadParameters(this.stackName, false);
   }
 
-  cancelUpdateParam() {
-    this.selectedParam.Value = this.selectedParam.OriginalValue + "";
-    this.displayParamDialog = false;
+  cancelUpdateSsmParam() {
+    this.selectedSsmParam.Value = this.selectedSsmParam.OriginalValue + "";
+    this.displaySsmParamDialog = false;
   }
 
-  updateParam() {
+
+  cancelUpdateStackParam() {
+    this.selectedStackParam.ParameterValue = this.selectedStackParam.OriginalValue + "";
+    this.displayStackParamDialog = false;
+  }
+
+  updateStackParam() {
+    this.displayStackParamDialog = false;
+  }
+
+  updateSsmParam() {
     const self = this;
 
-    if(this.selectedParam && this.selectedParam.Name) {
-      const paramName = this.selectedParam.Name;
+    if(this.selectedSsmParam && this.selectedSsmParam.Name) {
+      const paramName = this.selectedSsmParam.Name;
 
       this.confirmationService.confirm({
-        message: `Confirm update of parameter ${paramName} value to ${this.selectedParam.Value}?`,
+        message: `Confirm update of parameter ${paramName} value to ${this.selectedSsmParam.Value}?`,
         header: "Parameter update",
         reject: () => {
-          this.displayParamDialog = false;
+          this.displaySsmParamDialog = false;
         },
         accept: () => {
           self.isLoading = true;
-          this.parameterService.updateParameter(paramName, this.selectedParam.Value)
+          this.parameterService.updateParameter(paramName, this.selectedSsmParam.Value)
             .subscribe(
               p => {
                 self.messageService.add({
@@ -253,7 +278,7 @@ export class StackComponent extends BaseComponent {
                 });
                 self.errorMsg = '';
                 self.isLoading = false;
-                this.displayParamDialog = false;
+                this.displaySsmParamDialog = false;
                 this.reloadParams();
               },
               e => {
@@ -281,40 +306,61 @@ export class StackComponent extends BaseComponent {
     console.log('Creating changeset');
     const self = this;
     self.isLoading = true;
-    this.stackService.createChangeSet(this.stackName)
-      .subscribe(
-        p => {
-          this.createdChangesetId = p.Id;
-          self.messageService.add({
-            severity: 'info',
-            summary: 'Success',
-            detail: "Changeset created",
-            life: 5000
-          });
-          self.errorMsg = '';
-          self.isLoading = false;
-          this.reloadParams();
-        },
-        e => {
-          console.log(e);
-          self.messageService.add({
-            severity: 'error',
-            summary: 'Status retrieval failed',
-            detail: e.message,
-            life: 5000
-          });
-          self.errorMsg = e.message;
-          self.isLoading = false;
-        },
-        () => {
+    if(this.stack) {
+      this.stackService.createChangeSet(this.stack)
+        .subscribe(
+          p => {
+            this.createdChangesetId = p.Id;
+            self.messageService.add({
+              severity: 'info',
+              summary: 'Success',
+              detail: "Changeset created",
+              life: 5000
+            });
+            self.errorMsg = '';
+            self.isLoading = false;
+            this.reloadParams();
+          },
+          e => {
+            console.log(e);
+            self.messageService.add({
+              severity: 'error',
+              summary: 'Status retrieval failed',
+              detail: e.message,
+              life: 5000
+            });
+            self.errorMsg = e.message;
+            self.isLoading = false;
+          },
+          () => {
 
-        }
-      );
+          }
+        );
+    }
   }
 
-  editParam(param: IParameter) {
-    this.selectedParam = param;
-    this.displayParamDialog = true;
+  editSsmParam(param: ISSMParameter) {
+    this.selectedSsmParam = param;
+    this.displaySsmParamDialog = true;
+  }
+
+  editStackParam(param: IStackParameter) {
+    if(!param.ResolvedValue) {
+      this.selectedStackParam = param;
+      this.displayStackParamDialog = true;
+    }
+    else {
+      console.log(param.ParameterKey);
+      const ssmParam = this.parameters.find((x) => x.Name == param.ParameterValue);
+      if(ssmParam) {
+        this.selectedSsmParam = ssmParam;
+        this.displaySsmParamDialog = true;
+      } else {
+        console.log('Cannot find ssmParam');
+      }
+
+    }
+
   }
 
   hasCreatedChangeSet() {

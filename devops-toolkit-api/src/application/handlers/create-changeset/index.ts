@@ -43,7 +43,7 @@ exports.handler = async (event: APIGatewayEvent) => {
 
     // First, get the current stack
     const q1: DescribeStacksCommandInput = {
-      StackName: body.stackName,
+      StackName: body.stack.StackName,
     };
     const r = await client.describeStacks(region, q1);
     if (!r.Stacks || r.Stacks.length != 1) {
@@ -52,11 +52,21 @@ exports.handler = async (event: APIGatewayEvent) => {
     const currentStack = r.Stacks[0];
 
     const currentTime = new Date();
+
+    let params: any = currentStack.Parameters;
+
+    if (AuthUtils.isAdmin(userClaims)) {
+      console.info('User is an admin; including provided stack params');
+      params = body.stack.Parameters;
+    } else {
+      console.info('User is not an admin; excluding provided stack params');
+    }
+
     const q2: CreateChangeSetCommandInput = {
       // eslint-disable-next-line max-len
       ChangeSetName: `${userClaims.given_name}${userClaims.family_name}-${currentTime.getUTCFullYear()}${currentTime.getUTCMonth()}${currentTime.getUTCDate()}${currentTime.getUTCHours()}${currentTime.getUTCMinutes()}`,
-      StackName: body.stackName,
-      Parameters: currentStack.Parameters,
+      StackName: body.stack.StackName,
+      Parameters: params,
       ChangeSetType: 'UPDATE',
       Capabilities: currentStack.Capabilities,
       UsePreviousTemplate: true,
