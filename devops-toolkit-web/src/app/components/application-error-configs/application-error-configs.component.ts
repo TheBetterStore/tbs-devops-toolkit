@@ -65,12 +65,13 @@ export class ApplicationErrorConfigsComponent {
     const self = this;
     self.isLoading = true;
     this.applicationErrorService.getAppErrorConfigs()
-    .subscribe(
-      p => {
+    .subscribe( {
+      next: (p) => {
+        console.log(p)
         self.applicationErrorConfigs = p;
         this.applicationErrorService.getDlqErrorCounts()
-          .subscribe(
-            q => {
+          .subscribe( {
+            next: (q) => {
               for (let i = 0; i < q.length; i++) {  // Access object[key] here
                 let dlqName = q[i].dlqName;
                 let recs = self.applicationErrorConfigs.filter(o => o.DlqName == dlqName);
@@ -81,13 +82,13 @@ export class ApplicationErrorConfigsComponent {
               self.errorMsg = '';
               self.isLoading = false;
             },
-            e1 => {
+            error: (e1) => {
               self.errorMsg = e1.message;
               self.isLoading = false;
-            }
+            }}
           )
       },
-      e => {
+      error: (e) => {
         console.log(e);
         self.messageService.add({
           severity: 'error',
@@ -98,9 +99,7 @@ export class ApplicationErrorConfigsComponent {
         self.errorMsg = e.message;
         self.isLoading = false;
       },
-      () => {
-      }
-    );
+    });
   }
 
   editRec(rec: IApplicationErrorConfig) {
