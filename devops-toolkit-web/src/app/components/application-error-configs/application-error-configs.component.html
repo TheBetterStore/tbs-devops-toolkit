@@ -98,12 +98,18 @@
     <ng-template pTemplate="content">
       <div class="field">
         <label for="name">ApplicationId</label>
-        <input class="form-control"
+        <input *ngIf="!applicationErrorConfig.CreatedAt" class="form-control"
                type="text"
                pInputText
                id="name"
                [(ngModel)]="applicationErrorConfig.ApplicationId"
                required
+               autofocus />
+        <input *ngIf="applicationErrorConfig.CreatedAt" class="form-control"
+               type="text"
+               pInputText
+               [(ngModel)]="applicationErrorConfig.ApplicationId"
+               disabled
                autofocus />
         <small class="p-error" *ngIf="submitted && !applicationErrorConfig.ApplicationId">
           Application is required.
@@ -121,13 +127,13 @@
         </textarea>
       </div>
       <div class="field top-buffer">
-        <label for="remediation">Remediation</label>
+        <label for="dlqName">DLQ Name</label>
         <textarea  class="form-control"
-                   id="remediation"
+                   id="dlqName"
                    pInputTextarea
                    [(ngModel)]="applicationErrorConfig.DlqName"
                    required
-                   rows="3"
+                   rows="1"
                    cols="20">
         </textarea>
       </div>
