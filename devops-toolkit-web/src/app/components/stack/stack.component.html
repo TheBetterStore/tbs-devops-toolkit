@@ -126,8 +126,10 @@
             [value]="stack?.Parameters"
             dataKey="ParameterKey"
             [rows]="pageSize"
+            [paginator]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+            [showCurrentPageReport]="true"
             styleClass="p-datatable-striped"
-            [scrollable]="true" scrollHeight="400px" [virtualScroll]="true" [virtualScrollItemSize]="46"
             [loading]="isLoading">
 
             <ng-template pTemplate="header">
@@ -144,13 +146,13 @@
                     <p-columnFilter type="text" field="ParameterValue" display="menu"></p-columnFilter>
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:10rem">
                   <div class="flex align-items-center">
                     SSM Param Value?
                     <p-columnFilter type="text" field="ResolvedValue" display="menu"></p-columnFilter>
                   </div>
                 </th>
-                <th></th>
+                <th scope="col" style="min-width:15rem"></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-param>
@@ -160,7 +162,7 @@
                 <td *ngIf="param.ParameterValue == param.OriginalValue"><span>{{ param.ParameterValue }}</span></td>
                 <td><span>{{ param.ResolvedValue }}</span></td>
                 <td>
-                  <div *ngIf="isAdmin()" class="flex align-items-center justify-content-center gap-2">
+                  <div class="flex align-items-center justify-content-center gap-2">
                     <button *ngIf="isMaintainer()" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editStackParam(param)"></button>
                   </div>
                 </td>
