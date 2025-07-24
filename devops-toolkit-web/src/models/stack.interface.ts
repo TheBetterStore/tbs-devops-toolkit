@@ -4,7 +4,7 @@ export interface IStack {
 
   Description: string;
 
-  Parameters: any;
+  Parameters: any[];
 
   DriftInformation: IStackDriftInformation;
 
