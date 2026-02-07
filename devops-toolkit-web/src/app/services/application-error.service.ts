@@ -67,6 +67,13 @@ export class ApplicationErrorService extends BaseService {
     // First, backup for later upload
     const obj: IApplicationErrorConfig = {...a}; // Copy object, then remove file
     obj.FileToUpload = undefined;
+    obj.DlqErrorCount = undefined;
+
+    const currentTime = new Date().toISOString();
+    if(!obj.CreatedAt) {
+      obj.CreatedAt = currentTime;
+    }
+    obj.LastUpdatedAt = currentTime;
 
     let url = `${environment.apiBaseUrl}/v1/app-error-configs`;
 
@@ -122,6 +129,7 @@ function mapDlqErrorCounts(r: any) {
 function mapConfigs(r: any) {
   let x: IApplicationErrorConfig[] =r.Items;
   let y = x.map(mapConfig);
+  console.log('Service', y)
   return y;
 }
 

@@ -24,7 +24,7 @@ exports.handler = async (event: APIGatewayEvent) => {
     return response;
   }
 
-  let pageSize = 10;
+  let pageSize = 50; // Max allowed for an SDK call for params
   let filters: ParameterStringFilter[] = [];
   let nextToken = '';
   let region = '';
@@ -40,7 +40,7 @@ exports.handler = async (event: APIGatewayEvent) => {
     }
 
     filters = JSON.parse(event.queryStringParameters['filters'] + '');
-    pageSize = Number(event.queryStringParameters['pageSize'] || 10);
+    pageSize = Number(event.queryStringParameters['pageSize'] || 50);
     nextToken = event.queryStringParameters['nextToken'] + '';
     region = params.region + '';
 

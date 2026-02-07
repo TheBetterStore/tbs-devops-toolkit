@@ -119,7 +119,7 @@ export class StackComponent extends BaseComponent {
             const tags = self.stack?.Tags;
             const securityTag = tags.find((x: { Key: string; }) => x.Key == 'security');
             self.securityTag = (securityTag?.Value ? securityTag?.Value : "");
-            console.log(self.stack?.Parameters);
+            // console.log(self.stack?.Parameters);
             if(self.stack?.Parameters) {
               self.stack.Parameters.sort((a: any, b: any) => {
                 const x = a.ParameterKey;
@@ -182,6 +182,14 @@ export class StackComponent extends BaseComponent {
           self.isLoading = false;
           if(p.NextToken && p.Parameters && p.Parameters.length > 0) {
             this.hasMoreParameters = true;
+          }
+          for(let i = 0; i < self.parameters.length; i++) {
+            const p = self.parameters[i];
+            let x = self.stack?.Parameters.find( x => x.ParameterValue == p.Name);
+            if(x && x.ResolvedValue != p.Value) {
+              x.OriginalValue = x.ResolvedValue;
+              x.PendingValue = p.Value
+            }
           }
         },
         e => {

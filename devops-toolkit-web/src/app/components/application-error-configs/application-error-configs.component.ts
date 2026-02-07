@@ -65,32 +65,30 @@ export class ApplicationErrorConfigsComponent {
     const self = this;
     self.isLoading = true;
     this.applicationErrorService.getAppErrorConfigs()
-    .subscribe(
-      p => {
+    .subscribe( {
+      next: (p) => {
+        console.log(p)
         self.applicationErrorConfigs = p;
         this.applicationErrorService.getDlqErrorCounts()
-          .subscribe(
-            q => {
-              console.log(q)
-
+          .subscribe( {
+            next: (q) => {
               for (let i = 0; i < q.length; i++) {  // Access object[key] here
                 let dlqName = q[i].dlqName;
-                let obj = self.applicationErrorConfigs.find(o => o.DlqName == dlqName);
-                console.log(obj);
-                if(obj) {
-                  obj.DlqErrorCount = q[i].itemCount || 0;
+                let recs = self.applicationErrorConfigs.filter(o => o.DlqName == dlqName);
+                for(let j = 0; j < recs.length; j++) {
+                  recs[j].DlqErrorCount = q[i].itemCount || 0;
                 }
               }
               self.errorMsg = '';
               self.isLoading = false;
             },
-            e1 => {
+            error: (e1) => {
               self.errorMsg = e1.message;
               self.isLoading = false;
-            }
+            }}
           )
       },
-      e => {
+      error: (e) => {
         console.log(e);
         self.messageService.add({
           severity: 'error',
@@ -101,9 +99,7 @@ export class ApplicationErrorConfigsComponent {
         self.errorMsg = e.message;
         self.isLoading = false;
       },
-      () => {
-      }
-    );
+    });
   }
 
   editRec(rec: IApplicationErrorConfig) {
@@ -155,7 +151,8 @@ export class ApplicationErrorConfigsComponent {
 
   saveRec() {
     const self = this;
-    this.submitted = true;
+    self.submitted = true;
+    self.isLoading = true;
 
 
     if (this.applicationErrorConfig.ApplicationId?.trim()) {
@@ -170,39 +167,28 @@ export class ApplicationErrorConfigsComponent {
       this.applicationErrorService.saveAppErrorConfig(config)
         .subscribe(
           p => {
-            // Now, upload image
-            this.applicationErrorService.getDocsPresignedUrl(config.ImageKey || '', 'PUT')
-              .subscribe(
-                q => {
-                  console.log('File to upload?', config.FileToUpload);
-                  if(config.FileToUpload) {
-                    this.applicationErrorService.uploadFile(config.FileToUpload, q.s3PresignedUrl)
-                      .subscribe(
-                        q => {
-                          console.log('File uploaded', q);
-                        }
-                      )
-                  }
-                  self.errorMsg = '';
-                  self.isLoading = false;
-                  self.messageService.add({
-                    severity: 'success',
-                    summary: 'Success',
-                    detail: "Application saved",
-                    life: 5000
+            if(config.ImageKey) {
+              // Now, upload image
+              this.applicationErrorService.getDocsPresignedUrl(config.ImageKey || '', 'PUT')
+                .subscribe(
+                  q => {
+                    console.log('File to upload?', config.FileToUpload);
+                    if(config.FileToUpload) {
+                      this.applicationErrorService.uploadFile(config.FileToUpload, q.s3PresignedUrl)
+                        .subscribe(
+                          q => {
+                            console.log('File uploaded', q);
+                          }
+                        )
+                    }
+                    self.onApplicationSaved(true);
                   });
-                })
+            } else {
+              self.onApplicationSaved(true);
+            }
           },
           e => {
-            console.log(e);
-            self.messageService.add({
-              severity: 'error',
-              summary: 'Update failed',
-              detail: e.message,
-              life: 5000
-            });
-            self.errorMsg = e.message;
-            self.isLoading = false;
+            self.onApplicationSaved(false, e);
           },
           () => {
             this.applicationErrorConfigs = [...this.applicationErrorConfigs];
@@ -211,6 +197,29 @@ export class ApplicationErrorConfigsComponent {
           }
         );
 
+    }
+  }
+
+  onApplicationSaved(isSuccess: boolean, e?: Error) {
+    this.errorMsg = '';
+    this.isLoading = false;
+
+    if(isSuccess) {
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Success',
+        detail: "Application saved",
+        life: 5000
+      });
+      this.loadApplicationErrorConfigs();
+    } else {
+      console.log(e);
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Update failed',
+        detail: e?.message,
+        life: 5000
+      });
     }
   }
 

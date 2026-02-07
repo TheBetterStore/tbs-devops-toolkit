@@ -58,6 +58,8 @@
               [value]="parameters"
               dataKey="Name"
               [rows]="pageSize"
+              [paginator]="true"
+              currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
               selectionMode="single"
               [showCurrentPageReport]="true"
               styleClass="p-datatable-striped"
@@ -72,20 +74,20 @@
                       <p-columnFilter type="text" field="Name" display="menu"></p-columnFilter>
                     </div>
                   </th>
-                  <th scope="col" style="min-width:10rem">
+                  <th scope="col" style="min-width:5rem">
                     <div class="flex align-items-center">
                       Type
                       <p-columnFilter type="text" field="Type" display="menu"></p-columnFilter>
                     </div>
                   </th>
-                  <th scope="col" style="min-width:10rem">
+                  <th scope="col" style="min-width:8rem">
                     <div class="flex align-items-center">
                       Value
                       <p-columnFilter type="text" field="Value" display="menu"></p-columnFilter>
                     </div>
                   </th>
-                  <th scope="col">Version</th>
-                  <th scope="col">Last Modified</th>
+                  <th scope="col" style="min-width:5rem">Version</th>
+                  <th scope="col" style="min-width:7rem">Last Modified</th>
                 </tr>
               </ng-template>
               <ng-template pTemplate="body" let-param>
@@ -95,7 +97,7 @@
                   <td *ngIf="param.Type!='String' && param.Type!='StringList'">********</td>
                   <td *ngIf="param.Type=='String' || param.Type=='StringList'">
                     <span *ngIf="param.HasChanged" class="changed">{{ param.Value }}</span>
-                    <span *ngIf="!param.HasChanged">{{ param.Value }}</span>
+                    <span *ngIf="!param.HasChanged" [title]="param.OriginalValue">{{ param.Value }}</span>
                   </td>
                   <td>{{ param.Version }}</td>
                   <td>{{ param.LastModifiedDateLocalFormatted }}</td>
@@ -116,18 +118,20 @@
     <div class="col-7">
       <div class="card">
         <div class="card-header">
-          <h3>Edit Parameters</h3>
+          <h3>Stack Input Parameters</h3>
         </div>
         <div class="card-body">
 
           <div class="overflow-auto">
           <p-table
             #dt2
-            [value]="stack?.Parameters"
+            [value]="stack?.Parameters || []"
             dataKey="ParameterKey"
             [rows]="pageSize"
+            [paginator]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+            [showCurrentPageReport]="true"
             styleClass="p-datatable-striped"
-            [scrollable]="true" scrollHeight="400px" [virtualScroll]="true" [virtualScrollItemSize]="46"
             [loading]="isLoading">
 
             <ng-template pTemplate="header">
@@ -144,23 +148,23 @@
                     <p-columnFilter type="text" field="ParameterValue" display="menu"></p-columnFilter>
                   </div>
                 </th>
-                <th scope="col" style="min-width:15rem">
+                <th scope="col" style="min-width:10rem">
                   <div class="flex align-items-center">
                     SSM Param Value?
                     <p-columnFilter type="text" field="ResolvedValue" display="menu"></p-columnFilter>
                   </div>
                 </th>
-                <th></th>
+                <th scope="col" style="min-width:15rem"></th>
               </tr>
             </ng-template>
             <ng-template pTemplate="body" let-param>
               <tr class="table-sm">
                 <td>{{ param.ParameterKey }}</td>
-                <td *ngIf="param.ParameterValue != param.OriginalValue" class="changed"><span>{{ param.ParameterValue }}</span></td>
-                <td *ngIf="param.ParameterValue == param.OriginalValue"><span>{{ param.ParameterValue }}</span></td>
-                <td><span>{{ param.ResolvedValue }}</span></td>
+                <td><span>{{ param.ParameterValue }}</span></td>
+                <td *ngIf="param.PendingValue" class="changed"><span title="Original value: {{param.ResolvedValue}}">{{ param.PendingValue }}</span></td>
+                <td *ngIf="!param.PendingValue"><span>{{ param.ResolvedValue }}</span></td>
                 <td>
-                  <div *ngIf="isAdmin()" class="flex align-items-center justify-content-center gap-2">
+                  <div class="flex align-items-center justify-content-center gap-2">
                     <button *ngIf="isMaintainer()" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editStackParam(param)"></button>
                   </div>
                 </td>

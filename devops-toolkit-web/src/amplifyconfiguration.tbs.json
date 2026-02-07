@@ -1,18 +1,18 @@
 {
   "aws_project_region": "ap-southeast-2",
   "aws_cognito_region": "ap-southeast-2",
-  "aws_user_pools_id": "{USERPOOL_ID}",
-  "aws_user_pools_web_client_id": "{USERPOOL_WEBCLIENTID}",
+  "aws_user_pools_id": "ap-southeast-2_7lrhBvnNV",
+  "aws_user_pools_web_client_id": "58a00f37bq3li6d7upfvj9u49r",
   "oauth": {
-    "domain": "{AUTH_SUBDOMAIN}.auth.ap-southeast-2.amazoncognito.com",
+    "domain": "devopstoolkit.auth.ap-southeast-2.amazoncognito.com",
     "scope": [
       "email",
       "openid",
       "profile",
       "aws.cognito.signin.user.admin"
     ],
-    "redirectSignIn": "https://{BASE_URL}/login/",
-    "redirectSignOut": "https://{BASE_URL}/login/",
+    "redirectSignIn": "https://toolkit.thebetterstore.net/login/",
+    "redirectSignOut": "https://toolkit.thebetterstore.net/login/",
     "responseType": "code"
   },
   "federationTarget": "COGNITO_USER_POOLS",
