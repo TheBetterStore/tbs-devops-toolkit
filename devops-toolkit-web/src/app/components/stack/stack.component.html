@@ -57,7 +57,7 @@
               #dt1
               [value]="parameters"
               dataKey="Name"
-              [rows]="pageSize"
+              [rows]="50"
               [paginator]="true"
               currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
               selectionMode="single"
@@ -108,7 +108,7 @@
 
         </div>
       </div>
-      <div *ngIf="isMaintainer() && securityTag != 'pci' && parameters.length > 0 " class="row top-buffer">
+      <div *ngIf="isMaintainer() && securityTag != 'pci' && (parameters.length > 0 || stack?.Parameters?.length || 0 > 0)" class="row top-buffer">
         <div class="col-12 text-end">
           <button pButton class="btn btn-outline-success" (click)="createChangeSet()">Create ChangeSet</button>
           <button *ngIf="hasCreatedChangeSet()" pButton class="btn btn-outline-primary" (click)="viewCreatedChangeSet()">View Created ChangeSet</button>
@@ -161,11 +161,14 @@
               <tr class="table-sm">
                 <td>{{ param.ParameterKey }}</td>
                 <td><span>{{ param.ParameterValue }}</span></td>
-                <td *ngIf="param.PendingValue" class="changed"><span title="Original value: {{param.ResolvedValue}}">{{ param.PendingValue }}</span></td>
+                <td *ngIf="param.PendingValue && param.ResolvedValue" class="changed"><span title="Original value: {{param.ResolvedValue}}">{{ param.PendingValue }}</span></td>
                 <td *ngIf="!param.PendingValue"><span>{{ param.ResolvedValue }}</span></td>
                 <td>
                   <div class="flex align-items-center justify-content-center gap-2">
-                    <button *ngIf="isMaintainer()" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editStackParam(param)"></button>
+                    <button title="Edit stack ssm param" *ngIf="isMaintainer() && param.ResolvedValue" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-success mr2" (click)="editStackParam(param)"></button>
+                  </div>
+                  <div class="flex align-items-center justify-content-center gap-2">
+                    <button title="Edit stack input param" *ngIf="isAdmin() && !param.ResolvedValue" pButton pRipple type="button" icon="pi pi-pencil" class="p-button-warning mr2" (click)="editStackParam(param)"></button>
                   </div>
                 </td>
               </tr>

@@ -58,6 +58,7 @@ export class StackComponent extends BaseComponent {
   nextToken: string = "";
   maxRowsPerPage = 20;
   pageSize = 20;
+  paramPageSize = 10;
   offset = 0;
 
   sub: any;
@@ -174,7 +175,6 @@ export class StackComponent extends BaseComponent {
     this.parameterService.getParameters([nameFilter], this.pageSize, this.offset, sortField, sortOrder, nextToken)
       .subscribe(
         p => {
-          console.log(p)
           self.parameterResponse = p;
           self.parameters = this.mapParameters(p.Parameters);
           self.nextToken = p.NextToken;
@@ -190,6 +190,7 @@ export class StackComponent extends BaseComponent {
               x.OriginalValue = x.ResolvedValue;
               x.PendingValue = p.Value
             }
+            console.log(x)
           }
         },
         e => {
