@@ -1,0 +1,902 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  The Better Store Order API
+
+Transform:
+  - AWS::Serverless-2016-10-31
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+
+  LoginCFStackName:
+    Type: String
+
+  Route53AppDomainName:
+    Type: String
+
+  PersistErrorReservedConcurrency:
+    Type: String
+    Description: Populated DDb from DLQs. Allow setting to 0 if too many!
+    Default: 1
+
+  ReceiveAlarmsReservedConcurrency:
+    Type: String
+    Default: 4
+
+  GetAlarmsReservedConcurrency:
+    Type: String
+    Default: 4
+
+  AppLoggingLevel:
+    Type: String
+    AllowedValues: [TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
+    Default: INFO
+
+  SystemLogLevel:
+    Type: String
+    AllowedValues: [DEBUG, INFO, WARN]
+    Default: INFO
+
+  SreMonitoringCFStackName:
+    Type: String
+    Default: tbs-sre-monitoring-dev
+
+  AllowedCorsDomains:
+    Type: String
+
+  AlarmPriorityThreshold:
+    Type: Number
+    Default: 4
+
+Resources:
+
+  DynamoDbStreamEventPipeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pipes.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: SourcePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:DescribeStream"
+                  - "dynamodb:GetRecords"
+                  - "dynamodb:GetShardIterator"
+                  - "dynamodb:ListStreams"
+                  - "sqs:SendMessage"
+                Resource:
+                  - !GetAtt DlqErrorTable.StreamArn
+        - PolicyName: TargetPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt SaveDlqErrorCountFunction.Arn
+
+  DlqErrorTable:
+    Type: AWS::DynamoDB::Table
+    #    DeletionPolicy: Retain
+    #    UpdateReplacePolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "messageId"
+          AttributeType: "S"
+        - AttributeName: "dlqName"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "messageId"
+          KeyType: "HASH"
+        - AttributeName: "dlqName"
+          KeyType: "RANGE"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      StreamSpecification:
+        StreamViewType: KEYS_ONLY
+
+  DlqErrorCountTable:
+    Type: AWS::DynamoDB::Table
+    #    DeletionPolicy: Retain
+    #    UpdateReplacePolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "dlqName"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "dlqName"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
+  DynamoDbStreamEventPipe:
+    Type: AWS::Pipes::Pipe
+    Properties:
+      Description: "Pipe to connect DDB stream to lambda"
+      RoleArn: !GetAtt DynamoDbStreamEventPipeRole.Arn
+      Source: !GetAtt DlqErrorTable.StreamArn
+      SourceParameters:
+        DynamoDBStreamParameters:
+          StartingPosition: LATEST
+          BatchSize: 10
+          MaximumBatchingWindowInSeconds: 300
+          MaximumRetryAttempts: 3
+      Target: !GetAtt SaveDlqErrorCountFunction.Arn
+      TargetParameters:
+        LambdaFunctionParameters:
+          InvocationType: FIRE_AND_FORGET
+
+  AlarmTable:
+    Type: AWS::DynamoDB::Table
+    #    DeletionPolicy: Retain
+    #    UpdateReplacePolicy: Retain
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "alarmName"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "alarmName"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      #      ProvisionedThroughput:
+      #        ReadCapacityUnits: 1
+      #        WriteCapacityUnits: 1
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-LambdaPolicies
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !Sub "arn:aws:sqs:*:${AWS::AccountId}:*DLQ"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Get*
+                  - "dynamodb:Put*"
+                  - "dynamodb:Scan*"
+                  - "dynamodb:Update*"
+                Resource:
+                  - !GetAtt DlqErrorTable.Arn
+                  - !GetAtt DlqErrorCountTable.Arn
+                  - !GetAtt AlarmTable.Arn
+              - Effect: Allow
+                Action:
+                  - "sns:Publish"
+                Resource:
+                  - !Ref EnrichedErrorSNSTopic
+
+
+  PersistDlqErrorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Persist error details from DLQs to DynamoDB
+      Tracing: Active
+      ReservedConcurrentExecutions: !Sub ${PersistErrorReservedConcurrency}
+      LoggingConfig:
+        LogGroup: !Ref PersistDlqErrorFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DLQ_ERROR_TABLE_NAME: !Ref DlqErrorTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/event-handlers/receive-lambdadlq-errors/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  PersistDlqErrorFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-PersistDlqErrorFunction"
+      RetentionInDays: 30
+
+  SaveDlqErrorCountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Persist error details from DLQs to DynamoDB
+      Tracing: Active
+      ReservedConcurrentExecutions: 5
+      LoggingConfig:
+        LogGroup: !Ref SaveDlqErrorCountFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DLQ_ERROR_COUNT_TABLE_NAME: !Ref DlqErrorCountTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/event-handlers/save-lambdadlq-errorcount/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  SaveDlqErrorCountFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-SaveDlqErrorCountFunction"
+      RetentionInDays: 30
+
+  GetDlqErrorCountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Get error counts from DynamoDB
+      Tracing: Active
+      ReservedConcurrentExecutions: 1
+      LoggingConfig:
+        LogGroup: !Ref GetDlqErrorCountsFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DLQ_ERROR_COUNT_TABLE_NAME: !Ref DlqErrorCountTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/command-handlers/get-lambdadlq-errorcounts/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  GetDlqErrorCountsFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-GetDlqErrorCountsFunction"
+      RetentionInDays: 30
+
+  GetDlqErrorsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Get error counts from DynamoDB
+      Tracing: Active
+      ReservedConcurrentExecutions: !Sub ${PersistErrorReservedConcurrency}
+      LoggingConfig:
+        LogGroup: !Ref GetDlqErrorsFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DLQ_ERROR_TABLE_NAME: !Ref DlqErrorTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/command-handlers/get-lambdadlq-errors/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  GetDlqErrorsFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-GetDlqErrorsFunction"
+      RetentionInDays: 30
+
+  EnrichedErrorSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${AWS::StackName}-EnrichedErrorSNSTopic
+      KmsMasterKeyId: alias/aws/sns
+
+  ReceiveAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Receive alarms from SNS
+      Tracing: Active
+      ReservedConcurrentExecutions: !Sub ${ReceiveAlarmsReservedConcurrency}
+      LoggingConfig:
+        LogGroup: !Ref ReceiveAlarmsFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DDB_ALARM_TABLE_NAME: !Ref AlarmTable
+          ALARM_PRIORITY_THRESHOLD: !Ref AlarmPriorityThreshold
+          ENRICHED_ERROR_SNS_TOPIC_ARN: !Ref EnrichedErrorSNSTopic
+          APPLICATION_ERROR_CONFIG_TABLE_NAME: 'TBD'
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/event-handlers/receive-alarms/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  ReceiveAlarmsFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-ReceiveAlarmsFunction"
+      RetentionInDays: 30
+
+  UpdateAlarmFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Update alarm via toolkit
+      Tracing: Active
+      ReservedConcurrentExecutions: !Sub ${GetAlarmsReservedConcurrency}
+      LoggingConfig:
+        LogGroup: !Ref UpdateAlarmFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DDB_ALARM_TABLE_NAME: !Ref AlarmTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          ALARM_PRIORITY_THRESHOLD: !Ref AlarmPriorityThreshold
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/command-handlers/update-alarm/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  UpdateAlarmFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-UpdateAlarmFunction"
+      RetentionInDays: 30
+
+  GetAlarmsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: index.handler
+      Runtime: nodejs22.x
+      MemorySize: 512
+      Timeout: 10
+      Description: Get alarms from SNS
+      Tracing: Active
+      ReservedConcurrentExecutions: !Sub ${GetAlarmsReservedConcurrency}
+      LoggingConfig:
+        LogGroup: !Ref GetAlarmsFunctionLogs
+        LogFormat: JSON
+        ApplicationLogLevel: !Ref AppLoggingLevel
+        SystemLogLevel: !Ref SystemLogLevel
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          DDB_ALARM_TABLE_NAME: !Ref AlarmTable
+          ALLOWED_CORS_DOMAINS: !Ref AllowedCorsDomains
+          ALARM_PRIORITY_THRESHOLD: !Ref AlarmPriorityThreshold
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: false
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints:
+          - src/application/command-handlers/get-alarms/index.ts
+        External:
+          - "@aws-sdk/*"
+
+  GetAlarmsFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-GetAlarmsFunction"
+      RetentionInDays: 30
+
+  ErrorsSNSSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: lambda
+      TopicArn:
+        Fn::ImportValue: !Sub ${SreMonitoringCFStackName}:ErrorSNSTopic:Arn
+      Endpoint: !GetAtt ReceiveAlarmsFunction.Arn
+
+  ErrorsSNSInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ReceiveAlarmsFunction
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn:
+        Fn::ImportValue: !Sub ${SreMonitoringCFStackName}:ErrorSNSTopic:Arn
+
+  CWLogGroupApiGwAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["API-Gateway-Access-Logs_", !Sub "${AWS::StackName}"]]
+      RetentionInDays: 365
+
+  GetDlqErrorCountsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "GetDlqErrorCountsFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SreErrorApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  GetDlqErrorsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "GetDlqErrorsFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SreErrorApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  GetAlarmsFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "GetAlarmsFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SreErrorApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  UpdateAlarmFunctionApiGatewayInvoke:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref "UpdateAlarmFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SreErrorApi}/*"
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  SreErrorApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      EndpointConfiguration: REGIONAL
+      MinimumCompressionSize: 0
+      TracingEnabled: true
+      DisableExecuteApiEndpoint: true
+      OpenApiVersion: 3.0.1
+      AccessLogSetting:
+        DestinationArn: !GetAtt CWLogGroupApiGwAccessLogs.Arn
+        Format: >
+          {"requestTimeEpoch": $context.requestTimeEpoch, "requestId":"$context.requestId",
+          "httpMethod": "$context.httpMethod", "path":"$context.path", "resourcePath": "$context.resourcePath",
+          "status": "$context.status",
+          "lambdaRequestId": "$context.integration.requestId", "integrationStatus": "$context.integration.status",
+          "xrayTraceId": "$context.xrayTraceId", "responseLatency": $context.responseLatency,
+          "integrationLatency": "$context.integrationLatency", "error": "$context.error.message",
+          "userAgent": "$context.identity.userAgent", "sourceIp": "$context.identity.sourceIp"}
+      MethodSettings:
+        - HttpMethod: "*"
+          ResourcePath: "/*"
+          DataTraceEnabled: false
+          MetricsEnabled: true # Enable detailed metrics (error 404, latence, ...)
+          ThrottlingRateLimit: 10
+          ThrottlingBurstLimit: 10
+          LoggingLevel: ERROR
+      DefinitionBody:
+        openapi: "3.0.1"
+        info:
+          title: !Sub "${AWS::StackName}-api"
+          version: "2021-06-10T02:04:23Z"
+        paths:
+          /alarms:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetAlarmsFunction.Arn}/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /alarms/{id}:
+            put:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${UpdateAlarmFunction.Arn}/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /dlqerrors:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetDlqErrorsFunction.Arn}/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+          /dlqerrors/count:
+            get:
+              security:
+                - DevopsToolkitUser: [ ]
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  description: "200 response"
+                  headers:
+                    Strict-Transport-Security:
+                      schema:
+                        type: "string"
+                    Access-Control-Allow-Origin:
+                      schema:
+                        type: "string"
+                  content: { }
+              x-amazon-apigateway-integration:
+                httpMethod: "POST"
+                uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetDlqErrorCountsFunction.Arn}/invocations"
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                passthroughBehavior: "when_no_match"
+                contentHandling: "CONVERT_TO_TEXT"
+                type: "aws_proxy"
+            options:
+              consumes:
+                - "application/json"
+              produces:
+                - "application/json"
+              responses:
+                "200":
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: "string"
+                    Access-Control-Allow-Methods:
+                      type: "string"
+                    Access-Control-Allow-Headers:
+                      type: "string"
+                    Strict-Transport-Security:
+                      type: "string"
+                    X-Frame-Options:
+                      type: "string"
+                    Content-Security-Policy:
+                      type: "string"
+              x-amazon-apigateway-integration:
+                responses:
+                  default:
+                    statusCode: "200"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+                      method.response.header.X-Frame-Options: "'DENY'"
+                      method.response.header.Content-Security-Policy: "'default-src \"none\"; frame-ancestors \"none\"'"
+                requestTemplates:
+                  application/json: "{\"statusCode\": 200}"
+                passthroughBehavior: "when_no_match"
+                type: "mock"
+
+        securityDefinitions:
+          DevopsToolkitUser:
+            type: "apiKey"
+            name: "Authorization"
+            in: "header"
+            x-amazon-apigateway-authtype: "cognito_user_pools"
+            x-amazon-apigateway-authorizer:
+              providerARNs:
+                - Fn::ImportValue: !Sub ${LoginCFStackName}:UserPool:Arn
+              type: "cognito_user_pools"
+        x-amazon-apigateway-gateway-responses:
+          DEFAULT_5XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              gatewayresponse.header.Access-Control-Max-Age: "'86400'"
+              gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+          DEFAULT_4XX:
+            responseParameters:
+              gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
+              gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+              gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              gatewayresponse.header.Access-Control-Max-Age: "'86400'"
+              gatewayresponse.header.Strict-Transport-Security: "'max-age=31536000; includeSubdomains; preload'"
+        x-amazon-apigateway-minimum-compression-size: 0
+
+  ApiGwExecutionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub API-Gateway-Execution-Logs_${SreErrorApi}/Prod
+      RetentionInDays: 30
+
+  ApiBasePathMappingv2:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      DomainName: !Sub "api.${Route53AppDomainName}"
+      ApiId: !Ref SreErrorApi
+      Stage: !Ref SreErrorApi.Stage
+      ApiMappingKey: "toolkit-sre/v1"
+
+Outputs:
+
+  DlqErrorTableName:
+    Description: Ddb Error table Name
+    Value: !Ref DlqErrorTable
+    Export:
+      Name: !Sub '${AWS::StackName}:DlqErrorTable:Name'
+
+  DlqErrorTableArn:
+    Description: Ddb Error table Arn
+    Value: !GetAtt DlqErrorTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}:DlqErrorTable:Arn'
+
+  PersistDlqErrorFunctionName:
+    Description: DLQFunction for handling lambda DLQ errors
+    Value: !Ref PersistDlqErrorFunction
+    Export:
+      Name: !Sub '${AWS::StackName}:PersistDlqErrorFunction:Name'
+
+  PersistDlqErrorFunctionArn:
+    Description: DLQFunction for handling lambda DLQ errors
+    Value: !GetAtt PersistDlqErrorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}:PersistDlqErrorFunction:Arn'
